@@ -4,7 +4,7 @@
 // Not wired into `prisma migrate deploy` on purpose -- seeding a login is an
 // operator action, not a schema change.
 import { PrismaClient } from "@prisma/client";
-import * as argon2 from "argon2";
+import * as bcrypt from "bcryptjs";
 import "dotenv/config";
 
 // Uses the superuser connection, not RUNTIME_DATABASE_URL -- the restricted
@@ -25,7 +25,7 @@ async function main() {
     return;
   }
 
-  const passwordHash = await argon2.hash(password);
+  const passwordHash = await bcrypt.hash(password, 12);
   const admin = await prisma.user.create({
     data: {
       email,

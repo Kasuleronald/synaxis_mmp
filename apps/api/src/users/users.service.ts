@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
-import * as argon2 from "argon2";
+import * as bcrypt from "bcryptjs";
 import { ORG_ASSIGNABLE_ROLES } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
@@ -36,7 +36,7 @@ export class UsersService {
       throw new BadRequestException(`Organizations cannot assign the ${dto.role} role`);
     }
 
-    const passwordHash = await argon2.hash(dto.temporaryPassword);
+    const passwordHash = await bcrypt.hash(dto.temporaryPassword, 12);
 
     return runWithTenant(this.prisma, ctx, async (tx) => {
       if (dto.branchId) {

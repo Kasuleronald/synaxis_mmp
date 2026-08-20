@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import * as argon2 from "argon2";
+import * as bcrypt from "bcryptjs";
 import { Role } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
@@ -22,7 +22,7 @@ export class OrganizationsService {
    * rows themselves, never for any ministry-data table.
    */
   async createOrganization(ctx: TenantContext, dto: CreateOrganizationDto) {
-    const passwordHash = await argon2.hash(dto.orgAdmin.password);
+    const passwordHash = await bcrypt.hash(dto.orgAdmin.password, 12);
 
     return runWithTenant(this.prisma, ctx, async (tx) => {
       const existing = await tx.organization.findUnique({ where: { slug: dto.slug } });

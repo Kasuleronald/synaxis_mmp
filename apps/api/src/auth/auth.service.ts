@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { randomBytes } from "crypto";
-import * as argon2 from "argon2";
+import * as bcrypt from "bcryptjs";
 import { SessionUser } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant } from "../prisma/tenant";
@@ -31,7 +31,7 @@ export class AuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
-    const passwordOk = await argon2.verify(user.passwordHash, password);
+    const passwordOk = await bcrypt.compare(password, user.passwordHash);
     if (!passwordOk) {
       throw new UnauthorizedException("Invalid email or password");
     }
@@ -84,7 +84,7 @@ export class AuthService {
     if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
       throw new BadRequestException("This reset link has expired or is no longer valid.");
     }
-    const passwordHash = await argon2.hash(newPassword);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
     await runWithTenant(this.prisma, { organizationId: null, isPlatformAdmin: true }, (tx) =>
       tx.user.update({
         where: { id: user.id },
