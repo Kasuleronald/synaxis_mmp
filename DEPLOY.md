@@ -21,18 +21,30 @@ which means login will silently fail (cookie never gets stored) until the
 subdomain has a real SSL certificate active. Issue that first, or right
 after — don't be surprised if login doesn't work before HTTPS is live.
 
-## 1. Clone the repo onto the server
+## 1. Clone and deploy the repo via Webuzo's Git Version Control
 
-In Webuzo's Git Version Control feature (or via SSH if you have it), clone
-into the subdomain's document root:
+Webuzo's Git feature works in two steps, not one plain `git clone`:
 
-```
-git clone https://github.com/Kasuleronald/synaxis_mmp.git /home/scholars/public_html/synaxis
-```
+1. **Create the repo entry** pointing at `https://github.com/Kasuleronald/synaxis_mmp`
+   — Webuzo clones it into its own internal path
+   (`/home/scholars/git/synaxis_mmp`), separate from the live site.
+2. **Deploy** — a `.deploy.json` at the repo root (already committed) tells
+   Webuzo's "Deploy HEAD Commit" button what to copy from that internal
+   clone into `/home/scholars/public_html/synaxis` (the subdomain's actual
+   document root):
+   ```json
+   {
+     "DEPLOYPATH": "/home/scholars/public_html/synaxis/",
+     "task": ["apps", "packages", "package.json", "package-lock.json"]
+   }
+   ```
 
-(Use the SSH URL `git@github.com:Kasuleronald/synaxis_mmp.git` instead if
-you've added a deploy key — either works, this is a public clone URL, no
-credentials needed to *read* the repo.)
+Each time you want to pick up new commits: click **"Update From Remote"**
+first (pulls into the internal clone), then **"Deploy HEAD Commit"** (copies
+into the live path). Neither step runs `npm install`/`build`/migrations for
+you — that's steps 4 onward below, done once over SSH/terminal after the
+first deploy, and again after any deploy that changes dependencies, schema,
+or code.
 
 ## 2. Create the Postgres database
 
@@ -155,7 +167,8 @@ double check `WEB_ORIGIN` in `.env` is the `https://` URL.
 
 ## Ongoing deploys (after this first one)
 
-1. `git pull` in the app directory (or use Webuzo's Git deploy button).
+1. In Webuzo's Git Version Control: **Update From Remote**, then **Deploy
+   HEAD Commit**.
 2. `npm install` (only if `package-lock.json` changed).
 3. `npx prisma migrate deploy --schema apps/api/prisma/schema.prisma` (only
    if there are new migrations -- check `apps/api/prisma/migrations/` for

@@ -1,0 +1,9 @@
+{
+  "DEPLOYPATH": "/home/scholars/public_html/synaxis/",
+  "task": [
+    "apps",
+    "packages",
+    "package.json",
+    "package-lock.json"
+  ]
+}
