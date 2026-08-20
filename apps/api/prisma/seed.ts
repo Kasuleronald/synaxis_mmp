@@ -7,8 +7,11 @@ import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
 import "dotenv/config";
 
+// Uses the superuser connection, not RUNTIME_DATABASE_URL -- the restricted
+// role is subject to row-level security, and this insert has no tenant
+// context (organizationId is null) to satisfy it.
 const prisma = new PrismaClient({
-  datasourceUrl: process.env.RUNTIME_DATABASE_URL ?? process.env.DATABASE_URL,
+  datasourceUrl: process.env.DATABASE_URL,
 });
 
 async function main() {

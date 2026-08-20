@@ -33,7 +33,11 @@ import { TestimoniesModule } from "./testimonies/testimonies.module";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    // Explicit envFilePath so this resolves to apps/api/.env regardless of
+    // the process's cwd -- Webuzo's Node.js Selector runs the compiled app
+    // from the repo root, not apps/api, so the default cwd-relative lookup
+    // would silently miss the .env file in production.
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: join(__dirname, "..", ".env") }),
     // Production only -- local dev always serves the web app through Vite
     // on its own port instead, so apps/web/dist may not even exist locally.
     // `/api*` is excluded since main.ts sets that as the API's global

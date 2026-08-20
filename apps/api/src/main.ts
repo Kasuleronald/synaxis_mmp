@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import { join } from "path";
+import { execSync } from "child_process";
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
@@ -11,6 +13,20 @@ import { Pool } from "pg";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
+  if (process.env.NODE_ENV === "production") {
+    // Webuzo's Node.js Selector has no shell/build step -- so the one-time
+    // "migrate, seed" work is done here instead, on every boot. Both are
+    // idempotent (prisma migrate deploy no-ops with nothing pending; the
+    // seed script no-ops if the admin email already exists), so re-running
+    // them on every restart is safe and just costs a couple of seconds.
+    const apiRoot = join(__dirname, "..");
+    execSync("npx --no-install prisma migrate deploy", { cwd: apiRoot, stdio: "inherit" });
+    execSync("npx --no-install ts-node --transpile-only prisma/seed.ts", {
+      cwd: apiRoot,
+      stdio: "inherit",
+    });
+  }
+
   // bodyParser: false -- Nest's default json parser caps at 100kb, which
   // rejects a base64-encoded church logo (Settings screen). Re-added below
   // with a higher limit instead.

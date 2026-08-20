@@ -1,0 +1,44 @@
+name: Build deploy branch
+
+# Webuzo's Node.js Selector has no shell/build step -- it can only pull code
+# and start/stop a process. So the build happens here instead: on every push
+# to master, this installs deps, generates the Prisma client (with the Linux
+# binary targets set in schema.prisma), and compiles all three workspaces on
+# a real Linux runner (matching the production server's OS), then force-pushes
+# the result -- including node_modules and every dist/ folder, which are
+# gitignored on master -- to a `deploy` branch. Point Webuzo's Git Version
+# Control at `deploy`, not `master`, so "Update From Remote" + "Deploy HEAD
+# Commit" pull already-built code.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npx prisma generate --schema apps/api/prisma/schema.prisma
+
+      - run: npm run build
+
+      - name: Publish built artifacts to the deploy branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B deploy
+          git add -f node_modules apps/api/dist apps/web/dist packages/shared/dist
+          git commit -m "Deploy build: ${GITHUB_SHA::7}" --allow-empty
+          git push --force origin deploy
