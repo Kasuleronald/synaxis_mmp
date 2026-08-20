@@ -38,4 +38,4 @@ ALTER TABLE "fixed_asset_edit_requests" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "fixed_asset_edit_requests"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "fixed_asset_edit_requests" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "fixed_asset_edit_requests" TO scholars_life_mmp_app;

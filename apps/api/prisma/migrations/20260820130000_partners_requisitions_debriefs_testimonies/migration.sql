@@ -186,4 +186,4 @@ ALTER TABLE "testimonies" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "testimonies"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "partners", "fund_requisitions", "requisition_accountabilities", "requisition_receipts", "event_debriefs", "testimonies" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "partners", "fund_requisitions", "requisition_accountabilities", "requisition_receipts", "event_debriefs", "testimonies" TO scholars_life_mmp_app;

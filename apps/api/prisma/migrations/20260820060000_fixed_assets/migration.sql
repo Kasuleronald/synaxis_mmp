@@ -118,4 +118,4 @@ CREATE POLICY tenant_isolation ON "asset_condition_photos"
       AND r."organizationId" = current_setting('app.current_org_id', true)::text
   ));
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "fixed_assets", "asset_condition_requests", "asset_condition_photos" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "fixed_assets", "asset_condition_requests", "asset_condition_photos" TO scholars_life_mmp_app;

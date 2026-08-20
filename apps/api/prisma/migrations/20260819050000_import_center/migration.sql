@@ -61,4 +61,4 @@ ALTER TABLE "import_staging_rows" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "import_staging_rows"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "import_batches", "import_staging_rows" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "import_batches", "import_staging_rows" TO scholars_life_mmp_app;

@@ -1,7 +1,10 @@
 // Docker-free local Postgres for machines without Docker Desktop installed.
 // docker-compose.yml + db/init/01-app-role.sql remain the documented path;
-// this does the same two things (create the restricted life_mmp_app role,
-// run migrations) against a portable Postgres binary instead.
+// this does the same two things (create the restricted scholars_life_mmp_app
+// role, run migrations) against a portable Postgres binary instead.
+// The role is named to match Webuzo's mandatory "scholars_" account prefix
+// on the production database, so a single set of migrations' hardcoded
+// GRANT statements works unchanged in both places -- see DEPLOY.md.
 //
 // Usage: node scripts/dev-db.mjs [--seed]
 import EmbeddedPostgres from "embedded-postgres";
@@ -43,13 +46,13 @@ async function main() {
   const client = pg.getPgClient();
   await client.connect();
   await client.query(`SELECT 1`); // sanity check
-  const roleExists = await client.query(`SELECT 1 FROM pg_roles WHERE rolname = 'life_mmp_app'`);
+  const roleExists = await client.query(`SELECT 1 FROM pg_roles WHERE rolname = 'scholars_life_mmp_app'`);
   if (roleExists.rowCount === 0) {
-    console.log("Creating restricted app role life_mmp_app...");
+    console.log("Creating restricted app role scholars_life_mmp_app...");
     await client.query(
-      `CREATE ROLE life_mmp_app LOGIN PASSWORD 'life_mmp_app_dev' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
+      `CREATE ROLE scholars_life_mmp_app LOGIN PASSWORD 'life_mmp_app_dev' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
-    await client.query(`GRANT CONNECT ON DATABASE life_mmp TO life_mmp_app`);
+    await client.query(`GRANT CONNECT ON DATABASE life_mmp TO scholars_life_mmp_app`);
   }
   await client.end();
 

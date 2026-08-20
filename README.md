@@ -134,7 +134,7 @@ You asked me to review your older `My Church MVP` project and bring over what's 
 - **Sliding session timeout** — sessions now extend on activity (`rolling: true`) instead of expiring exactly 7 days after login regardless of use, so an actively-working user is never logged out mid-task.
 
 **Two things from that project were checked and found already solid here, so nothing needed to change:**
-- Its "non-owner DB role so RLS actually binds" pattern — Synaxis MMP already runs as a dedicated `life_mmp_app` role (`NOSUPERUSER NOBYPASSRLS`), separate from the migration-owner role, with `FORCE ROW LEVEL SECURITY` on every ministry table on top of that.
+- Its "non-owner DB role so RLS actually binds" pattern — Synaxis MMP already runs as a dedicated restricted role (`NOSUPERUSER NOBYPASSRLS`, named `scholars_life_mmp_app` in production to match Webuzo's enforced account-name prefix), separate from the migration-owner role, with `FORCE ROW LEVEL SECURITY` on every ministry table on top of that.
 - Its "side-table to resolve org before login" pattern — Synaxis MMP solves the same problem differently: the platform-admin RLS bypass GUC is used for the one exact-email-match lookup at login time, which already lets an org-agnostic login work without a parallel table.
 
 **Deliberately not carried over** (the old project's own docs flagged these as accepted shortcuts, not best practices — see the security review that surfaced them): global cross-org email uniqueness for login, money stored as plain integers with no decimal/minor-unit handling, and a half-finished local-first-to-real-backend migration architecture. None of these are patterns worth having in a system meant to scale to many churches.

@@ -114,8 +114,8 @@ CREATE POLICY tenant_isolation ON "users"
 -- =========================================================================
 -- Runtime grants for the restricted app role (see db/init/01-app-role.sql).
 -- This migration itself runs as the superuser bootstrap role; the running
--- API connects as life_mmp_app, which is subject to the policies above.
+-- API connects as scholars_life_mmp_app, which is subject to the policies above.
 -- =========================================================================
-GRANT USAGE ON SCHEMA public TO life_mmp_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO life_mmp_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO life_mmp_app;
+GRANT USAGE ON SCHEMA public TO scholars_life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scholars_life_mmp_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO scholars_life_mmp_app;

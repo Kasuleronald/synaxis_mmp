@@ -111,4 +111,4 @@ ALTER TABLE "notifications" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "notifications"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "giving_categories", "giving_records", "notifications" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "giving_categories", "giving_records", "notifications" TO scholars_life_mmp_app;

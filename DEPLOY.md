@@ -46,43 +46,47 @@ you — that's steps 4 onward below, done once over SSH/terminal after the
 first deploy, and again after any deploy that changes dependencies, schema,
 or code.
 
-## 2. Create the Postgres database
+## 2. Create the Postgres database (done)
 
-Using Webuzo's PostgreSQL Manager, create a database (e.g. `synaxis_mmp`)
-and a primary user with full rights on it — this becomes your
-`DATABASE_URL`. Note the host/port Webuzo gives you (often `localhost:5432`
-if Postgres runs on the same VPS).
+Created via Webuzo's PostgreSQL Manager:
+- Database: `scholars_synaxis_mmp`
+- Primary/owner user: `scholars_kasule` — this is your `DATABASE_URL`
+  connection, used only for running migrations.
 
-### Create the restricted runtime role
+### The restricted runtime role (done)
 
-This is the important part, not optional: the app's row-level security
-(every church's data walled off from every other church) only actually
-holds if the app connects as a role that **cannot bypass RLS**. Connect via
-Webuzo's SQL tool (or `psql` if you have terminal access) as the primary
-user and run:
+Webuzo has no SQL console for Postgres and no terminal/SSH was available,
+so this was done through the panel's plain "Add Database User" +
+"Add User To Database" forms instead of raw SQL — which works fine here,
+since a role created that way is non-superuser and non-bypass-RLS by
+Postgres's own defaults (those attributes only exist if something
+explicitly grants them, which a plain "add user" form never does). That's
+really the only thing that actually matters for row-level security to hold;
+which tables the panel's UI happened to grant it access to doesn't affect
+RLS enforcement either way.
 
-```sql
-CREATE ROLE life_mmp_app LOGIN PASSWORD 'pick-a-real-password-here'
-  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-GRANT CONNECT ON DATABASE synaxis_mmp TO life_mmp_app;
-```
+Webuzo enforces an account-name prefix on whatever you type, so asking for
+`life_mmp_app` came out as:
+- Restricted runtime user: **`scholars_life_mmp_app`**, attached to
+  `scholars_synaxis_mmp`.
 
-Every migration in this repo already contains `GRANT ... TO life_mmp_app`
-statements for its own tables (that's a hardcoded role name, so keep it as
-`life_mmp_app` exactly) — once you run the migrations in step 4, this role
-will have exactly the table-level permissions it needs, no more.
+Every migration's `GRANT ... TO ...` statements, `db/init/01-app-role.sql`,
+and local dev's `scripts/dev-db.mjs` all already target this exact name —
+if you ever recreate this user, it has to be called precisely
+`scholars_life_mmp_app` or migrations will fail with "role does not exist".
 
 ## 3. Set up environment variables
 
 `.env` is gitignored on purpose (it's not in the repo you cloned) — create
-it directly on the server at `apps/api/.env`:
+it directly on the server at `apps/api/.env`. **Don't paste real passwords
+into chat with Claude** — fill these in yourself, directly on the server:
 
 ```
 # Superuser/owner connection -- used only by `prisma migrate`/`prisma generate`.
-DATABASE_URL="postgresql://<primary-user>:<primary-password>@localhost:5432/synaxis_mmp?schema=public"
+DATABASE_URL="postgresql://scholars_kasule:<scholars_kasule-password>@localhost:5432/scholars_synaxis_mmp?schema=public"
 
 # Restricted connection the running app actually uses (step 2 above).
-RUNTIME_DATABASE_URL="postgresql://life_mmp_app:<the-password-you-set>@localhost:5432/synaxis_mmp?schema=public"
+RUNTIME_DATABASE_URL="postgresql://scholars_life_mmp_app:<scholars_life_mmp_app-password>@localhost:5432/scholars_synaxis_mmp?schema=public"
 
 SESSION_SECRET="<a-long-random-string-you-generate>"
 PORT=3000

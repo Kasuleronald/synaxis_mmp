@@ -224,4 +224,4 @@ ALTER TABLE "attendance_records" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "attendance_records"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "households", "members", "follow_ups", "events", "attendance_sessions", "attendance_records" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "households", "members", "follow_ups", "events", "attendance_sessions", "attendance_records" TO scholars_life_mmp_app;

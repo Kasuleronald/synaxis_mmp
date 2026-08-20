@@ -54,7 +54,7 @@ ALTER TABLE "self_registrations" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "self_registrations"
   USING ("organizationId" = current_setting('app.current_org_id', true)::text);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON "self_registrations" TO life_mmp_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "self_registrations" TO scholars_life_mmp_app;
 
 -- Public self-registration flow (parallels public_checkin_rls): a visitor
 -- filling out /register/:slug has no session, so resolving the Organization
