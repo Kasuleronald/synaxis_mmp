@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life MMP Blueprint</title>
+<style>
+html,body{margin:0;padding:0;}
+:root{
+  --bg:#F7F8F6;
+  --surface:#FFFFFF;
+  --surface-2:#EEF2EC;
+  --ink:#16201B;
+  --ink-muted:#4B564F;
+  --line:#DCE3DA;
+  --line-soft:#E7ECE4;
+  --accent:#1B7A57;
+  --accent-ink:#0E4B34;
+  --accent-soft:#E3F1EA;
+  --accent2:#3F4FA0;
+  --accent2-soft:#E7E9F6;
+  --warn:#95611F;
+  --warn-soft:#F7ECDD;
+  --danger:#A23B3B;
+  --danger-soft:#F6E4E1;
+  --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1712;
+    --surface:#131F19;
+    --surface-2:#192720;
+    --ink:#E9F0EA;
+    --ink-muted:#A9B8AD;
+    --line:#25352C;
+    --line-soft:#1D2B23;
+    --accent:#54C293;
+    --accent-ink:#BFEBD4;
+    --accent-soft:#17352A;
+    --accent2:#98A3E8;
+    --accent2-soft:#232B4C;
+    --warn:#E3AC63;
+    --warn-soft:#3A2B14;
+    --danger:#E38C8C;
+    --danger-soft:#3A1E1E;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1712;
+  --surface:#131F19;
+  --surface-2:#192720;
+  --ink:#E9F0EA;
+  --ink-muted:#A9B8AD;
+  --line:#25352C;
+  --line-soft:#1D2B23;
+  --accent:#54C293;
+  --accent-ink:#BFEBD4;
+  --accent-soft:#17352A;
+  --accent2:#98A3E8;
+  --accent2-soft:#232B4C;
+  --warn:#E3AC63;
+  --warn-soft:#3A2B14;
+  --danger:#E38C8C;
+  --danger-soft:#3A1E1E;
+}
+
+*{box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent-ink);}
+::selection{background:var(--accent-soft);}
+
+.shell{
+  display:grid;
+  grid-template-columns: 272px minmax(0,1fr);
+  max-width:1280px;
+  margin:0 auto;
+}
+@media (max-width: 900px){
+  .shell{grid-template-columns: 1fr;}
+  .toc{position:relative; top:0; height:auto; border-right:none; border-bottom:1px solid var(--line);}
+}
+
+.toc{
+  position:sticky; top:0; align-self:start;
+  height:100vh; overflow-y:auto;
+  padding:28px 20px 40px;
+  border-right:1px solid var(--line);
+}
+.toc .brand{
+  font-family:var(--font-display);
+  font-size:1.05rem;
+  letter-spacing:.02em;
+  margin-bottom:2px;
+}
+.toc .brand-sub{
+  font-size:.72rem;
+  color:var(--ink-muted);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-bottom:22px;
+  display:block;
+}
+.toc ol{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:2px;
+}
+.toc a{
+  display:flex; gap:10px;
+  text-decoration:none;
+  color:var(--ink-muted);
+  font-size:.83rem;
+  padding:6px 8px;
+  border-radius:6px;
+  line-height:1.35;
+}
+.toc a:hover{background:var(--surface-2); color:var(--ink);}
+.toc a .n{
+  font-variant-numeric:tabular-nums;
+  color:var(--accent-ink);
+  font-family:var(--font-mono);
+  font-size:.76rem;
+  flex:none;
+  width:1.4em;
+}
+
+main{padding:0 0 120px;}
+.cover{
+  padding:64px clamp(24px,5vw,72px) 48px;
+  border-bottom:1px solid var(--line);
+}
+.status{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:.72rem; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--accent-ink); background:var(--accent-soft);
+  padding:6px 12px; border-radius:100px; margin-bottom:22px;
+}
+.status .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+.cover h1{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:clamp(2.1rem, 4vw, 3.1rem);
+  line-height:1.08;
+  text-wrap:balance;
+  margin:0 0 18px;
+  max-width:20ch;
+}
+.cover .lead{
+  font-size:1.08rem;
+  color:var(--ink-muted);
+  max-width:64ch;
+  margin:0 0 28px;
+}
+.meta-row{
+  display:flex; flex-wrap:wrap; gap:28px;
+  padding-top:24px; border-top:1px solid var(--line-soft);
+}
+.meta-row div{display:flex; flex-direction:column; gap:4px;}
+.meta-row .k{font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-muted);}
+.meta-row .v{font-size:.92rem;}
+
+.section{
+  padding:56px clamp(24px,5vw,72px);
+  border-bottom:1px solid var(--line);
+  max-width:920px;
+}
+.section:last-child{border-bottom:none;}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:.76rem;
+  color:var(--accent-ink);
+  text-transform:uppercase; letter-spacing:.08em;
+  margin-bottom:10px;
+}
+.section h2{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:1.7rem;
+  margin:0 0 20px;
+  text-wrap:balance;
+}
+.section h3{
+  font-family:var(--font-body);
+  font-weight:650;
+  font-size:1.02rem;
+  margin:28px 0 10px;
+}
+.section p{max-width:70ch; margin:0 0 16px;}
+.section ul, .section ol{max-width:70ch; margin:0 0 16px; padding-left:1.3em;}
+.section li{margin-bottom:6px;}
+.section strong{font-weight:650;}
+
+.callout{
+  border:1px solid var(--line);
+  background:var(--surface);
+  border-left:3px solid var(--accent);
+  border-radius:8px;
+  padding:16px 18px;
+  margin:20px 0;
+  max-width:70ch;
+}
+.callout.warn{border-left-color:var(--warn); }
+.callout.warn .callout-label{color:var(--warn);}
+.callout.danger{border-left-color:var(--danger); }
+.callout.danger .callout-label{color:var(--danger);}
+.callout-label{
+  font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--accent-ink); margin-bottom:6px; font-weight:650;
+}
+.callout p{margin:0;}
+.callout p + p{margin-top:10px;}
+
+.table-wrap{overflow-x:auto; margin:18px 0 24px; border:1px solid var(--line); border-radius:10px;}
+table{border-collapse:collapse; width:100%; font-size:.88rem; background:var(--surface);}
+thead th{
+  text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--ink-muted); background:var(--surface-2);
+  padding:10px 14px; border-bottom:1px solid var(--line); white-space:nowrap;
+}
+tbody td{padding:10px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+td.tag{white-space:nowrap;}
+
+.pill{
+  display:inline-block; font-size:.72rem; padding:3px 9px; border-radius:100px;
+  font-weight:600; letter-spacing:.02em; white-space:nowrap;
+}
+.pill.mvp{background:var(--accent-soft); color:var(--accent-ink);}
+.pill.ff{background:var(--accent2-soft); color:var(--accent2);}
+.pill.future{background:var(--warn-soft); color:var(--warn);}
+
+.diagram{
+  border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  padding:20px; margin:20px 0 26px; overflow-x:auto;
+}
+.diagram figcaption{font-size:.78rem; color:var(--ink-muted); margin-top:12px;}
+
+.grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:70ch; margin:18px 0 24px;}
+@media (max-width:640px){.grid-2{grid-template-columns:1fr;}}
+.mini-card{border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:var(--surface);}
+.mini-card .k{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-muted); margin-bottom:6px;}
+
+.swatches{display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 0;}
+.swatch{width:22px; height:22px; border-radius:50%; border:1px solid var(--line-soft); flex:none;}
+
+code{font-family:var(--font-mono); font-size:.85em; background:var(--surface-2); padding:1px 5px; border-radius:4px;}
+
+.steps{counter-reset:st; max-width:70ch; margin:18px 0 24px; padding:0;}
+.steps li{list-style:none; margin-bottom:12px; padding-left:2em; position:relative;}
+.steps li::before{
+  counter-increment:st; content: counter(st); position:absolute; left:0; top:0;
+  width:1.5em; height:1.5em; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink);
+  font-family:var(--font-mono); font-size:.78rem; display:flex; align-items:center; justify-content:center;
+}
+
+.qa{counter-reset:q; max-width:70ch;}
+.qa li{list-style:none; margin-bottom:14px; padding-left:1.6em; position:relative;}
+.qa li::before{
+  counter-increment:q; content: counter(q) "."; position:absolute; left:0;
+  font-family:var(--font-mono); color:var(--accent-ink); font-size:.85rem;
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <nav class="toc">
+    <span class="brand">Life MMP</span>
+    <span class="brand-sub">Architecture Blueprint — v3</span>
+    <ol>
+      <li><a href="#s1"><span class="n">01</span>Understanding</a></li>
+      <li><a href="#s2"><span class="n">02</span>Product Scope</a></li>
+      <li><a href="#s3"><span class="n">03</span>System Architecture</a></li>
+      <li><a href="#s4"><span class="n">04</span>Technology</a></li>
+      <li><a href="#s5"><span class="n">05</span>Database</a></li>
+      <li><a href="#s6"><span class="n">06</span>Platform Hierarchy &amp; RBAC</a></li>
+      <li><a href="#s7"><span class="n">07</span>AI-Assisted Import</a></li>
+      <li><a href="#s8"><span class="n">08</span>Mobile Money</a></li>
+      <li><a href="#s9"><span class="n">09</span>Multi-Tenant &amp; Branches</a></li>
+      <li><a href="#s10"><span class="n">10</span>Offline &amp; Sync</a></li>
+      <li><a href="#s11"><span class="n">11</span>UI / UX &amp; Theming</a></li>
+      <li><a href="#s12"><span class="n">12</span>API</a></li>
+      <li><a href="#s13"><span class="n">13</span>Security</a></li>
+      <li><a href="#s14"><span class="n">14</span>Reporting</a></li>
+      <li><a href="#s15"><span class="n">15</span>90-Day Roadmap</a></li>
+      <li><a href="#s16"><span class="n">16</span>MVP Definition</a></li>
+      <li><a href="#s17"><span class="n">17</span>Risks</a></li>
+      <li><a href="#s18"><span class="n">18</span>Open Questions</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="cover">
+      <div class="status"><span class="dot"></span>Blueprint locked — all open questions answered, Sprint 1 starts now</div>
+      <h1>Life MMP — Product, Architecture &amp; 90-Day Build Blueprint</h1>
+      <p class="lead">A multi-tenant church operating platform, launching in Uganda: a platform team onboards churches, each church runs its own branches, roles, giving and mobile money independently — with AI-assisted import turning a church's existing Excel, PDF and Word records into clean data on day one.</p>
+      <div class="meta-row">
+        <div><span class="k">Team</span><span class="v">You + Claude, pair-built</span></div>
+        <div><span class="k">Target</span><span class="v">90 days to first live tenant</span></div>
+        <div><span class="k">Market</span><span class="v">Uganda → East Africa → global</span></div>
+        <div><span class="k">Domain</span><span class="v">church.scholarsas.com</span></div>
+        <div><span class="k">Hosting</span><span class="v">Oracle Cloud (OCI) — provisioned near the end</span></div>
+        <div><span class="k">Next step</span><span class="v">Scaffold Sprint 1 — foundation</span></div>
+      </div>
+    </header>
+
+    <section class="section" id="s1">
+      <div class="eyebrow">Section 01</div>
+      <h2>Understanding</h2>
+      <p>The platform is now named <strong>Life MMP</strong> — A Ministry Management Platform. The rename replaces "ZOE," which collided with the name of one of the actual churches lining up to join the platform (a church literally called Zoe would have shared its name with the software running it). "Life" keeps the original concept — growth, discipleship, vitality — without claiming a name a real tenant already owns.</p>
+      <p>It is, explicitly, a <strong>multi-tenant SaaS platform</strong>, not a single church's system that might one day host others. A platform team creates churches as tenants; each church's admin runs their own branches, staff, and giving independently, with data fully isolated from every other tenant. Tenancy is core infrastructure from day one, not a later retrofit.</p>
+      <p>Three realities shape the architecture beyond the module list itself:</p>
+      <ul>
+        <li><strong>No source system exists.</strong> Every onboarding church arrives with data trapped in spreadsheets, PDFs, and Word documents, each in whatever format that church happens to use. Getting that into Life MMP cleanly is a first-class product problem — the AI-assisted import module in Section 7.</li>
+        <li><strong>Payments are already solved per church.</strong> Churches already hold mobile money merchant codes. Life MMP's job is a thin, per-tenant integration layer, not a payment processor of its own (Section 8) — and by your direction, that integration is built last, once everything churches actually enter data into is solid.</li>
+        <li><strong>Production hosting arrives partway through the build.</strong> Oracle Cloud is provisioned near the end of the 90 days, not Week 1. The build is sequenced local-first from day one so that arrival is a cutover, not an architecture change — see Sections 4 and 10.</li>
+      </ul>
+      <div class="callout">
+        <div class="callout-label">90 days, not 30</div>
+        <p>The extra runway changes what's realistic. Fellowships, discipleship classes, directorate hierarchy, and a genuine offline-sync engine move back into the core build instead of being deferred — see the rebalanced scope in Section 2. MTN MoMo moves the other direction, to the very end, per your direction that it's low-urgency since every church already collects money its own way today.</p>
+      </div>
+    </section>
+
+    <section class="section" id="s2">
+      <div class="eyebrow">Section 02</div>
+      <h2>Product scope</h2>
+      <p>Rebalanced for a 90-day runway. More of the original module list fits inside the core build; mobile money moves to the very end since it's the one piece every church already has a working alternative to.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Module</th><th>Timing</th></tr></thead>
+          <tbody>
+            <tr><td>Platform admin — create orgs, appoint org admins</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Org admin — branches, roles, staff invites</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>5-theme design system + per-org logo/branding</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Members &amp; households</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>AI-assisted data import (any format + starter template)</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Visitors &amp; follow-up</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Attendance — manual + QR</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Events &amp; upcoming-events calendar</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Fellowships / cell groups</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Directorate / department hierarchy</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Discipleship school — programs, classes, enrollment, attendance</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Giving — manual entry, provider-agnostic ledger</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Executive dashboard + core reporting rollups</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>In-app notifications</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>Full local-first offline sync — Tier 1 modules</td><td class="tag"><span class="pill mvp">Day 90</span></td></tr>
+            <tr><td>MTN MoMo live integration</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Discipleship grading, promotion rules, certificates</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Volunteer scheduling, tasks &amp; workflow, documents</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Full communications — SMS / WhatsApp / email</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Airtel Money and other providers</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Projects, assets, partnerships</td><td class="tag"><span class="pill ff">Fast-follow</span></td></tr>
+            <tr><td>Automation / workflow rules engine</td><td class="tag"><span class="pill future">Future</span></td></tr>
+            <tr><td>Native Android/iOS shell app</td><td class="tag"><span class="pill future">Future</span></td></tr>
+            <tr><td>Kenya/Tanzania/Rwanda localization, M-Pesa/Tigo Pesa</td><td class="tag"><span class="pill future">Future</span></td></tr>
+            <tr><td>AI insights &amp; natural-language reporting</td><td class="tag"><span class="pill future">Future</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="s3">
+      <div class="eyebrow">Section 03</div>
+      <h2>System architecture</h2>
+      <p>Still a modular monolith behind a tenant-aware API, with the AI import pipeline and payment adapter from the previous draft. The one change: the client was never coupled to where the backend lives, so hosting can arrive mid-build without a rewrite.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+graph TB
+  subgraph Client["Client — local-first from Week 1"]
+    Web["Web App (PWA)"]
+    IDB[("IndexedDB
+mirrors server schema")]
+  end
+  Web <--> IDB
+  IDB -->|"sync batch, same contract
+whether host is local or live"| API["API Gateway — REST /api/v1
+tenant resolved from session"]
+  API --> App["Modular Monolith
+Members · Attendance · Events · Giving"]
+  App --> PG[("PostgreSQL
+row-level security by organization_id")]
+  App --> Obj[("Object Storage
+uploads, church logos, photos")]
+  App --> Import["Import Worker"]
+  Import -->|"unstructured docs only"| Gemini["Gemini API — server-side key"]
+  App --> PayAdapter["Payment Adapter — scaffolded now,
+live drivers in fast-follow"]
+        </pre>
+        <figcaption>Weeks 1–~11: <code>App</code> and <code>PG</code> run on a local/interim environment (Docker Compose is enough). Around Sprint 6, Oracle Cloud (OCI) takes over that same role — the client and API contract don't change, only where they're hosted.</figcaption>
+      </div>
+    </section>
+
+    <section class="section" id="s4">
+      <div class="eyebrow">Section 04</div>
+      <h2>Technology</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Choice</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td>Frontend</td><td>React + TypeScript + Vite + Tailwind + shadcn/ui</td><td>Token-based styling throughout, so the 5-theme system (Section 11) is a set of CSS custom properties, not per-component rework.</td></tr>
+            <tr><td>Backend</td><td>Node.js + TypeScript, NestJS</td><td>Domain modules map to Nest modules with tenant guards applied centrally.</td></tr>
+            <tr><td>Database</td><td>PostgreSQL with row-level security, live from day one</td><td>Runs on Oracle Cloud Infrastructure once provisioned — a Postgres instance on an OCI compute/managed-DB instance, not a switch to Oracle Database itself; the RLS-based schema in Section 5 assumes Postgres throughout. Flagging this assumption in Section 18.</td></tr>
+            <tr><td>Client data layer</td><td>Dexie.js over IndexedDB, mirroring the server schema for Tier-1 entities</td><td>This is the primary layer the UI reads/writes during the local-first build period, and stays the offline cache permanently after cutover.</td></tr>
+            <tr><td>AI extraction</td><td>Gemini API (your key, server-side only)</td><td>Used only for unstructured documents — see Section 7.</td></tr>
+            <tr><td>Payments</td><td>Provider-adapter interface, scaffolded now, MTN MoMo driver built in fast-follow</td><td>Building the interface early (Sprint 1–2) means the fast-follow driver is a plug-in, not a redesign.</td></tr>
+            <tr><td>Hosting</td><td>Oracle Cloud Infrastructure (OCI), enabled near the end of the build</td><td>Development happens against local Docker containers until cutover; <code>church.scholarsas.com</code> points at OCI once live.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="s5">
+      <div class="eyebrow">Section 05</div>
+      <h2>Database — what changes</h2>
+      <div class="grid-2">
+        <div class="mini-card"><div class="k">organizations is real, not symbolic</div>Every tenant-scoped table carries a non-null <code>organization_id</code> with an enforced Postgres RLS policy. The row also carries <code>display_name</code>, <code>logo_url</code>, and <code>theme</code> — a church's own identity and chosen theme, not the platform's, is what its users see.</div>
+        <div class="mini-card"><div class="k">import_staging</div>Rows extracted from an upload land here first — <code>source_file_id</code>, <code>extracted_fields</code> (JSONB), <code>confidence</code>, <code>status</code>, <code>reviewed_by</code>. Nothing here is a real member/giving record until approved.</div>
+        <div class="mini-card"><div class="k">payment_providers</div>Per-org row: <code>provider_type</code>, <code>merchant_code</code>, encrypted API credentials, <code>environment</code>, <code>webhook_secret</code> — table exists Day 90, populated once MTN MoMo ships in fast-follow.</div>
+        <div class="mini-card"><div class="k">branches</div>What the brief called campuses — one org, many branches, unchanged modeling.</div>
+      </div>
+    </section>
+
+    <section class="section" id="s6">
+      <div class="eyebrow">Section 06</div>
+      <h2>Platform hierarchy &amp; RBAC</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Creates</th><th>Default access to tenant data</th></tr></thead>
+          <tbody>
+            <tr><td>Platform Administrator</td><td>Organizations; appoints the first Org Admin per organization</td><td><strong>None.</strong> No standing access to any church's members, giving, or pastoral data</td></tr>
+            <tr><td>Organization Admin</td><td>Branches, roles, staff invitations, payment provider setup, theme &amp; logo</td><td>Full access within their own organization only</td></tr>
+            <tr><td>Finance Officer</td><td>—</td><td>Giving records, org-wide; member directory names/contact only</td></tr>
+            <tr><td>Directorate / Department Head</td><td>—</td><td>Own department's members, tasks, reports</td></tr>
+            <tr><td>Fellowship Leader</td><td>—</td><td>Own fellowship's members and attendance</td></tr>
+            <tr><td>Volunteer Coordinator / Volunteer</td><td>—</td><td>Own team's roster and schedule</td></tr>
+            <tr><td>Member</td><td>—</td><td>Self only</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <div class="callout-label">Confirmed</div>
+        <p>Platform Administrator has <strong>no default access to tenant data</strong>. This is now a locked-in trust commitment, not an open question: any future support access has to be a logged, time-boxed break-glass action, never a standing permission. It's what lets Life MMP tell a church "we can't see your finances or your pastoral notes," and mean it.</p>
+      </div>
+    </section>
+
+    <section class="section" id="s7">
+      <div class="eyebrow">Section 07</div>
+      <h2>AI-assisted data import</h2>
+      <p>AI does extraction, never decision — a human always confirms before anything becomes a real record. Unchanged from the previous draft. What's new here is format flexibility: the pilot church's Excel is the first real test case, but the import pipeline is built to handle whatever a church actually has, not a format they're required to match.</p>
+      <ol class="steps">
+        <li><strong>Upload.</strong> Excel, CSV, PDF, or Word, tagged with what it is (member list, attendance register, giving log).</li>
+        <li><strong>Deterministic pass first, with fuzzy header matching.</strong> The column mapper recognizes common variants of a field automatically — "Name" / "Full Name" / "Member Name" all map to the same target field — instead of requiring an exact header match. This handles most real-world spreadsheets, including ones with no relation to any template, without an AI call.</li>
+        <li><strong>Gemini pass for the messy remainder.</strong> PDFs, Word documents, and spreadsheets without usable headers go to Gemini as extracted text, with a structured-output prompt asking for named fields and a confidence score per field.</li>
+        <li><strong>Staging, not the real table.</strong> Every extracted row lands in <code>import_staging</code>, flagged for low confidence and likely duplicates.</li>
+        <li><strong>Human review, then commit.</strong> A staff member fixes, dedupes, and approves; approved rows write to the real schema in one transaction with an audit log entry.</li>
+      </ol>
+      <div class="callout">
+        <div class="callout-label">Starter template — optional, not required</div>
+        <p>Alongside "bring whatever you have," Life MMP offers a downloadable starter spreadsheet with sensible columns (name, phone, gender, DOB, branch, department) for churches with no existing records, or who'd rather retype into a clean sheet than scan a paper register. It's a fast path, not a gate — the fuzzy mapper and Gemini extraction both work with or without it. Confirming you want this built in Section 18.</p>
+      </div>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  Upload["Upload
+xlsx / csv / pdf / docx
+any layout"] --> Detect{"Clean tabular
+headers?"}
+  Detect -->|"yes, incl. fuzzy match"| Map["Deterministic
+column mapper"]
+  Detect -->|"no"| Extract["Gemini extraction
++ confidence scores"]
+  Map --> Stage[("import_staging")]
+  Extract --> Stage
+  Stage --> Review["Human review
+fix, dedupe, approve"]
+  Review --> Commit["Commit transaction"]
+  Commit --> Live[("members / attendance / giving")]
+        </pre>
+      </div>
+      <div class="callout danger">
+        <div class="callout-label">Non-negotiable</div>
+        <p>Gemini extraction never writes directly to a live table. Money and membership status commit only after a human approves the staged row.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-label">Handling your Gemini key</div>
+        <p>When we scaffold the backend, I'll create a <code>.env</code> file with a placeholder — paste the key directly into that local file when it's ready, not in chat.</p>
+      </div>
+    </section>
+
+    <section class="section" id="s8">
+      <div class="eyebrow">Section 08</div>
+      <h2>Mobile money — built last, on purpose</h2>
+      <p>Churches already have merchant codes with providers — Life MMP's job is a thin, per-organization integration, not a payment platform. Per your direction, the live integration is the last thing built in the core roadmap: every church already has a working way to collect money today, so it's the one module where "not done yet" costs nothing at launch.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Piece</th><th>Design</th><th>Timing</th></tr></thead>
+          <tbody>
+            <tr><td>Provider-adapter interface</td><td>One interface, one driver per provider per organization</td><td>Scaffolded Sprint 1–2, so giving's data model never has to change later</td></tr>
+            <tr><td>Manual giving entry</td><td>Cash, bank transfer, or any provider — recorded against categories</td><td>Day 90</td></tr>
+            <tr><td>MTN MoMo Collections API driver</td><td>Request-to-Pay, webhook reconciliation to a giving record</td><td>Fast-follow</td></tr>
+            <tr><td>Airtel Money and others</td><td>New driver on the same interface</td><td>Fast-follow, as needed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="s9">
+      <div class="eyebrow">Section 09</div>
+      <h2>Multi-tenant &amp; branches</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+graph TD
+  Platform["Platform Administrator"] -->|"creates"| OrgA["Organization: Church A"]
+  Platform -->|"creates"| OrgB["Organization: Church B"]
+  Platform -->|"appoints"| AdminA["Org Admin — Church A"]
+  AdminA -->|"creates"| BranchA1["Branch: Kampala"]
+  AdminA -->|"creates"| BranchA2["Branch: Jinja"]
+  AdminA -->|"assigns role"| FinanceA["Finance Officer"]
+  AdminA -->|"assigns role"| FellowA["Fellowship Leader"]
+  BranchA1 --> DeptA["Department: Follow-up"]
+  BranchA1 --> FellA["Fellowship: Cell Group 4"]
+        </pre>
+        <figcaption>Church A and Church B never share a query result, a permission, a theme choice, or a payment credential.</figcaption>
+      </div>
+      <p>Isolation is enforced twice: application-layer tenant guards on every request, and Postgres row-level security underneath as the backstop.</p>
+    </section>
+
+    <section class="section" id="s10">
+      <div class="eyebrow">Section 10</div>
+      <h2>Offline &amp; sync — back in core scope</h2>
+      <p>The previous draft pushed the full sync engine to fast-follow to protect a 30-day launch. With 90 days, and a build that's local-first by necessity (Oracle Cloud isn't live until late in the timeline), the full engine belongs in the core build — it's being built anyway as the primary way the app talks to its own data.</p>
+      <div class="grid-2">
+        <div class="mini-card"><div class="k">Local-first as dev strategy</div>The client reads and writes IndexedDB directly from Sprint 1. A background sync worker drains an outbox against the API — which, until Sprint 6, is a local/interim server, and after Sprint 6, is Oracle Cloud. The app never notices the difference.</div>
+        <div class="mini-card"><div class="k">What stays online-only</div>Giving writes are never queued offline, AI import commits require a live connection to call Gemini — both unchanged from the original design, for the same integrity reasons.</div>
+      </div>
+      <div class="diagram">
+        <pre class="mermaid">
+sequenceDiagram
+  participant U as Usher (offline)
+  participant L as Local IndexedDB
+  participant S as Server API
+  U->>L: Save attendance record (uuid, v1)
+  Note over U,L: Device offline — marked "pending"
+  L-->>S: Connectivity restored — POST /sync/batch
+  S->>S: Apply idempotently by uuid + op id
+  alt No conflict
+    S-->>L: Ack (server version, timestamp)
+    L->>L: Mark "synced"
+  else Conflict — server version is newer
+    S-->>L: Conflict response
+    L->>L: Mark "needs review"
+  end
+        </pre>
+        <figcaption>Sync status renders as 🟢 Synced / 🟡 Syncing / 🔴 Offline / ⚠️ Sync failed across Tier-1 modules: members, attendance, visitors, follow-up, fellowship and discipleship attendance.</figcaption>
+      </div>
+    </section>
+
+    <section class="section" id="s11">
+      <div class="eyebrow">Section 11</div>
+      <h2>UI / UX &amp; theming</h2>
+      <p>Sidebar grouped by domain, <code>⌘K</code> global search, role-configured dashboards. Two identity layers stack on top of that shell: a platform-level <strong>theme</strong> the user picks, and a church-level <strong>logo and name</strong> the Org Admin sets (Section 5). They're independent — a church's brand doesn't change when a user picks a different theme, and a theme looks the same across every church that uses it.</p>
+      <h3>Five themes</h3>
+      <p>All five ship Day 90. Each is a light/dark token pair, not a single fixed color — respecting whichever mode the user's device is in.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Theme</th><th>Mood</th><th>Light accent</th><th>Dark accent</th></tr></thead>
+          <tbody>
+            <tr><td>Growth <em>(default)</em></td><td>Renewal, the platform's own root idea</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#1B7A57"></span></span> #1B7A57</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#54C293"></span></span> #54C293</td></tr>
+            <tr><td>Heritage</td><td>Dignified, liturgical, trust</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#2A3B7C"></span></span> #2A3B7C</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#7C8FE0"></span></span> #7C8FE0</td></tr>
+            <tr><td>Ember</td><td>Warm, evangelistic energy</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#C1502E"></span></span> #C1502E</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#E8895F"></span></span> #E8895F</td></tr>
+            <tr><td>Regal</td><td>Worship, celebration</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#6B3FA0"></span></span> #6B3FA0</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#B48FE0"></span></span> #B48FE0</td></tr>
+            <tr><td>Slate</td><td>Minimal, corporate, multi-campus</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#1E6E6E"></span></span> #1E6E6E</td><td class="tag"><span class="swatches"><span class="swatch" style="background:#5FC2C2"></span></span> #5FC2C2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <div class="callout-label">The two temp_assets logos, mapped in</div>
+        <p>Convenient coincidence: the dark-background mark's green-to-gold gradient already reads as <strong>Growth</strong>, and the light-background mark's purple-magenta already reads as <strong>Regal</strong> — those two need no recoloring. Heritage, Ember, and Slate would each want their own gradient pass if you want a themed mark per theme, using the accents above.</p>
+        <p>For the in-app header itself, recommend a single flat, single-color (not gradient) outline version of the mark rendered with <code>currentColor</code> — it then automatically matches whichever of the 5 themes × 2 modes a user has picked, without exporting 10 logo files. Save the full gradient versions for the marketing/landing page, where one fixed brand color is the point.</p>
+      </div>
+      <p><strong>Tenant identity in the header.</strong> Every logged-in user sees their own church's logo and name in the top bar — resolved from <code>organizations.display_name</code>/<code>logo_url</code> at session start and cached with the offline shell. A text-only wordmark fallback covers churches that haven't uploaded a logo yet.</p>
+      <p>Events surface "upcoming" prominently on the dashboard and in a lightweight calendar view — one of the first things a branch admin uses, so it belongs on the main dashboard, not buried in a module. The Import Center gets its own visual state machine — Uploaded → Extracting → Ready for Review → Committed.</p>
+    </section>
+
+    <section class="section" id="s12">
+      <div class="eyebrow">Section 12</div>
+      <h2>API</h2>
+      <p>Versioned REST (<code>/api/v1/{domain}</code>), every route resolving <code>organization_id</code> from the authenticated session — never from a client-supplied parameter. Domains: members, visitors, attendance, fellowships, discipleship, giving, events, import, payments, reports, sync. The contract is identical whether the server is a local Docker container (Weeks 1–~11) or Oracle Cloud (from Sprint 6) — that's what makes the cutover a deploy, not a rewrite.</p>
+    </section>
+
+    <section class="section" id="s13">
+      <div class="eyebrow">Section 13</div>
+      <h2>Security</h2>
+      <div class="grid-2">
+        <div class="mini-card"><div class="k">Tenant isolation is a security control</div>Row-level security by <code>organization_id</code>, tested directly — not assumed from application code being correct.</div>
+        <div class="mini-card"><div class="k">Secrets never touch the client</div>Gemini key and mobile money API credentials live server-side only, encrypted at rest.</div>
+        <div class="mini-card"><div class="k">Platform Admin break-glass</div>Any support access to tenant data is logged and time-boxed — see Section 6.</div>
+        <div class="mini-card"><div class="k">Standard hardening</div>Session auth, Argon2 hashing, audit logging, rate limiting, encryption at rest — unchanged from the original draft.</div>
+      </div>
+    </section>
+
+    <section class="section" id="s14">
+      <div class="eyebrow">Section 14</div>
+      <h2>Reporting</h2>
+      <p>Scheduled rollups feed the dashboard rather than live aggregation across every record on every page load. Day 90 ships member count, attendance trend, giving trend, and follow-up completion as computed daily rollups; deeper drill-down reporting is fast-follow.</p>
+    </section>
+
+    <section class="section" id="s15">
+      <div class="eyebrow">Section 15</div>
+      <h2>90-day roadmap</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sprint</th><th>Weeks</th><th>Focus</th><th>Ships</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>1–2</td><td>Foundation</td><td>Multi-tenant scaffolding + RLS, Platform Admin → Org Admin flow, branches, RBAC, 5-theme system, local-first client shell, Docker dev environment</td></tr>
+            <tr><td>2</td><td>3–4</td><td>People</td><td>Members, households, visitors, follow-up, attendance (manual + QR), events/calendar — all local-first with the real sync outbox from day one</td></tr>
+            <tr><td>3</td><td>5–6</td><td>Onboarding intelligence</td><td>Import Center: fuzzy column mapper, starter template, Gemini extraction, staging review, commit — tested directly against the pilot church's real Excel</td></tr>
+            <tr><td>4</td><td>7–8</td><td>Ministry structure</td><td>Fellowships/cell groups, directorate/department hierarchy, discipleship school (programs, classes, enrollment, attendance)</td></tr>
+            <tr><td>5</td><td>9–10</td><td>Money &amp; reporting</td><td>Giving (manual entry, provider-agnostic ledger), dashboard KPIs, in-app notifications, sync hardening (conflict queue, status indicators) across all Tier-1 modules</td></tr>
+            <tr><td>6</td><td>11–12</td><td>Production readiness</td><td>Oracle Cloud provisioning + cutover, security/isolation testing, pilot church onboarded for real, bug fixing</td></tr>
+            <tr><td>—</td><td>13</td><td>Launch</td><td>Final QA, go-live on church.scholarsas.com, monitoring</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Fast-follow, immediately after</h3>
+      <p>MTN MoMo live integration, discipleship grading/certificates/promotion, volunteer scheduling, tasks, document management, full communications (SMS/WhatsApp/email), Airtel Money.</p>
+    </section>
+
+    <section class="section" id="s16">
+      <div class="eyebrow">Section 16</div>
+      <h2>MVP definition</h2>
+      <p>Day 90 is done when: a Platform Administrator creates a new church and appoints its admin; the admin sets a theme, uploads the church logo, creates two branches, and invites a finance officer, a directorate head, and a fellowship leader; the admin uploads the church's real membership Excel — in whatever format it already is — reviews the AI-assisted extraction, and commits clean member records; an usher checks in Sunday attendance on a budget phone with a weak connection and it queues, then syncs correctly with a visible status once back online; a fellowship leader records their own cell group's attendance; a discipleship class tracks who's enrolled and who attended; giving is recorded manually against categories; and by Monday morning the admin's dashboard — served from <code>church.scholarsas.com</code> — shows member count, this week's attendance trend, and this week's giving.</p>
+    </section>
+
+    <section class="section" id="s17">
+      <div class="eyebrow">Section 17</div>
+      <h2>Risks</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Risk</th><th>Why it matters</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>90-day scope is fuller, still real work</td><td>More modules are back in core scope than the original 30-day cut carried</td><td>Section 16's MVP is the floor; anything past it explicitly waits for fast-follow, no exceptions mid-build</td></tr>
+            <tr><td>Local-first-then-cutover sequencing</td><td>Building against a local/interim server for ~11 weeks means the Oracle Cloud cutover is itself a risk point</td><td>Keep the API contract identical from Sprint 1 regardless of host; rehearse the cutover on a staging deploy before Sprint 6, not during it</td></tr>
+            <tr><td>Gemini extraction accuracy on real documents</td><td>Handwritten or poorly scanned registers may extract badly</td><td>Confidence scores + mandatory human review; never auto-commit</td></tr>
+            <tr><td>Tenant isolation bug</td><td>A missed <code>organization_id</code> filter leaks one church's data into another's — the worst possible bug for a multi-tenant platform</td><td>RLS as a backstop under every application-layer check; isolation tests written before Sprint 2 features build on top</td></tr>
+            <tr><td>MTN MoMo access lead time, even deferred</td><td>Developer/sandbox approval can take days once you do start it</td><td>Register for API access early even though the driver itself is built last, so approval isn't the fast-follow bottleneck</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="s18">
+      <div class="eyebrow">Section 18</div>
+      <h2>Open questions — resolved</h2>
+      <p>All six answered. Blueprint is locked; Sprint 1 starts now.</p>
+      <ol class="qa">
+        <li><strong>Oracle = OCI hosting + Postgres.</strong> Confirmed — Oracle Cloud Infrastructure is the compute/hosting layer; PostgreSQL remains the database engine throughout. Section 4/5 stand as written.</li>
+        <li><strong>IndexedDB = dev bridge + permanent offline cache.</strong> Confirmed — local-first development vehicle pre-cutover, then the standing offline cache after launch. Postgres is always the system of record once connected.</li>
+        <li><strong>Default theme: Growth.</strong> Confirmed as the out-of-the-box choice for new organizations.</li>
+        <li><strong>Naming: spell it out on first touch.</strong> "Life MMP" is the standing brand in nav, sidebar, and day-to-day UI; "A Ministry Management Platform" is spelled out once on login/landing pages and in email footers for first-time users.</li>
+        <li><strong>Starter import template: build it.</strong> A downloadable starter Excel (name, phone, gender, DOB, branch, department) ships alongside "bring whatever you have" — optional fast path, not a gate.</li>
+        <li><strong>Pilot church contact: a named contact there</strong>, not routed through you — to be shared once the pilot Excel is ready.</li>
+      </ol>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+    securityLevel: 'loose'
+  });
+</script>
+</body>
+</html>

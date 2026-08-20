@@ -1,0 +1,65 @@
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { AppController } from "./app.controller";
+import { PrismaModule } from "./prisma/prisma.module";
+import { AuthModule } from "./auth/auth.module";
+import { OrganizationsModule } from "./organizations/organizations.module";
+import { BranchesModule } from "./branches/branches.module";
+import { UsersModule } from "./users/users.module";
+import { HouseholdsModule } from "./households/households.module";
+import { MembersModule } from "./members/members.module";
+import { FollowUpsModule } from "./follow-ups/follow-ups.module";
+import { EventsModule } from "./events/events.module";
+import { AttendanceModule } from "./attendance/attendance.module";
+import { ImportsModule } from "./imports/imports.module";
+import { FellowshipsModule } from "./fellowships/fellowships.module";
+import { OrgUnitsModule } from "./org-units/org-units.module";
+import { DiscipleshipModule } from "./discipleship/discipleship.module";
+import { DeletionRequestsModule } from "./deletion-requests/deletion-requests.module";
+import { GivingModule } from "./giving/giving.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { RegistrationsModule } from "./registrations/registrations.module";
+import { AssetsModule } from "./assets/assets.module";
+import { FixedAssetsModule } from "./fixed-assets/fixed-assets.module";
+import { FellowshipReportsModule } from "./fellowship-reports/fellowship-reports.module";
+import { ReportsModule } from "./reports/reports.module";
+import { AnnouncementsModule } from "./announcements/announcements.module";
+import { BirthdaysModule } from "./birthdays/birthdays.module";
+import { PartnersModule } from "./partners/partners.module";
+import { RequisitionsModule } from "./requisitions/requisitions.module";
+import { TestimoniesModule } from "./testimonies/testimonies.module";
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    AuthModule,
+    OrganizationsModule,
+    BranchesModule,
+    UsersModule,
+    HouseholdsModule,
+    MembersModule,
+    FollowUpsModule,
+    EventsModule,
+    AttendanceModule,
+    ImportsModule,
+    FellowshipsModule,
+    OrgUnitsModule,
+    DiscipleshipModule,
+    DeletionRequestsModule,
+    GivingModule,
+    NotificationsModule,
+    RegistrationsModule,
+    AssetsModule,
+    FixedAssetsModule,
+    FellowshipReportsModule,
+    ReportsModule,
+    AnnouncementsModule,
+    BirthdaysModule,
+    PartnersModule,
+    RequisitionsModule,
+    TestimoniesModule,
+  ],
+  controllers: [AppController],
+})
+export class AppModule {}

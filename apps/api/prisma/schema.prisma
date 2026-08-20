@@ -1,0 +1,1303 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PLATFORM_ADMIN
+  ORG_ADMIN
+  FINANCE_OFFICER
+  DEPARTMENT_HEAD
+  FELLOWSHIP_LEADER
+  VOLUNTEER
+  MEMBER
+}
+
+enum Theme {
+  GROWTH
+  HERITAGE
+  EMBER
+  REGAL
+  SLATE
+}
+
+/// The tenant. Platform Administrators create these; everything else in the
+/// system (branches, users, and every future ministry-data table) hangs off
+/// organizationId and is walled off by Postgres row-level security.
+model Organization {
+  id          String   @id @default(uuid())
+  displayName String
+  slug        String   @unique
+  logoUrl     String?
+  theme       Theme    @default(GROWTH)
+  country     String?
+  city        String?
+  contactEmail String?
+  contactPhone String?
+  currency    String   @default("UGX")
+  // Platform Admin only -- a suspended org's users are blocked at login
+  // (AuthService.validateUser), before any session or org context exists.
+  isSuspended Boolean  @default(false)
+  // Custom vocabulary (Aug 2026): different churches call the same concept
+  // different things -- "Cell Group" vs "Fellowship", "Family Unit" vs
+  // "Household". Null means "use the built-in English default"; scoped to
+  // just the core entity nouns (nav labels + page titles), not every string
+  // in the app, per explicit direction.
+  memberTerm     String?
+  householdTerm  String?
+  fellowshipTerm String?
+  departmentTerm String?
+  // Atomically incremented (UPDATE ... SET memberNumberSeq = memberNumberSeq
+  // + 1 RETURNING) inside the same transaction as a member create -- that's
+  // what makes allocation race-safe under concurrent registrations without
+  // a per-org Postgres SEQUENCE.
+  memberNumberSeq Int @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branches Branch[]
+  users    User[]
+  households         Household[]
+  members            Member[]
+  followUps          FollowUp[]
+  events             Event[]
+  attendanceSessions AttendanceSession[]
+  attendanceRecords  AttendanceRecord[]
+  importBatches      ImportBatch[]
+  fellowships           Fellowship[]
+  orgUnits               OrgUnit[]
+  discipleshipPrograms   DiscipleshipProgram[]
+  discipleshipClasses    DiscipleshipClass[]
+  classEnrollments       ClassEnrollment[]
+  deletionRequests       DeletionRequest[]
+  givingCategories       GivingCategory[]
+  givingRecords          GivingRecord[]
+  funds                  Fund[]
+  vendors                Vendor[]
+  pledges                Pledge[]
+  givingBatches          GivingBatch[]
+  notifications          Notification[]
+  selfRegistrations      SelfRegistration[]
+  assets                 Asset[]
+  fixedAssets            FixedAsset[]
+  conditionRequests      AssetConditionRequest[]
+  fixedAssetEditRequests FixedAssetEditRequest[]
+  fellowshipReports      FellowshipReport[]
+  announcements          Announcement[]
+  partners               Partner[]
+  fundRequisitions       FundRequisition[]
+  requisitionAccountabilities RequisitionAccountability[]
+  eventDebriefs          EventDebrief[]
+  testimonies            Testimony[]
+
+  // Optional lightweight display-only currency toggle for finance screens --
+  // recomputes *displayed* amounts using this admin-set rate, never touches
+  // stored amounts/currency and is deliberately not historical-rate-aware
+  // (an accepted, documented tradeoff, not an oversight).
+  secondaryCurrency     String?
+  secondaryCurrencyRate Float?
+
+  @@map("organizations")
+}
+
+/// What the blueprint calls a campus. One org, many branches.
+model Branch {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  isMain         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users User[]
+  members            Member[]
+  events             Event[]
+  attendanceSessions AttendanceSession[]
+  fellowships        Fellowship[]
+  orgUnits           OrgUnit[]
+  discipleshipClasses DiscipleshipClass[]
+  givingRecords      GivingRecord[]
+  fixedAssets        FixedAsset[]
+
+  @@index([organizationId])
+  @@map("branches")
+}
+
+/// organizationId is null only for Platform Administrators, who are not
+/// members of any tenant. Every other role always belongs to exactly one org.
+model User {
+  id             String    @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  email          String    @unique
+  passwordHash   String
+  fullName       String
+  role           Role
+  isActive       Boolean   @default(true)
+  // Appointed by the Org Admin (Staff screen) -- can approve or reject a
+  // pending DeletionRequest. Deliberately not tied to a Role: an Org Admin
+  // may want a Finance Officer or a specific Department Head to hold this,
+  // not everyone who happens to share a role.
+  isDeletionApprover Boolean @default(false)
+  // Same appointment model as isDeletionApprover, kept as its own flag --
+  // an Org Admin may want a different set of people reviewing incoming
+  // self-registrations than the ones trusted to approve deletions.
+  isRegistrationApprover Boolean @default(false)
+  // Additive grant, same idea as isDeletionApprover/isRegistrationApprover:
+  // lets an Org Admin hand fellowship-report-submission rights to a User
+  // whose base Role isn't FELLOWSHIP_LEADER (e.g. a Department Head who also
+  // happens to run a cell group) without changing their role entirely.
+  isFellowshipLeader Boolean @default(false)
+  // Set when a Platform Admin generates a reset link for an org's admin
+  // (no email sending yet -- Section: "no forgot password option"). Single
+  // active token, cleared once used or replaced by a newer request.
+  passwordResetToken      String?   @unique
+  passwordResetExpiresAt  DateTime?
+  // Self-service profile photo -- reuses the generic Asset blob store (same
+  // optimize-in-browser path as Church Assets/condition-report photos)
+  // rather than a parallel image column.
+  avatarAssetId  String?
+  avatarAsset    Asset?    @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  membersAdded      Member[]           @relation("MemberAddedBy")
+  followUpsAssigned FollowUp[]         @relation("FollowUpAssignee")
+  checkIns          AttendanceRecord[] @relation("CheckedInBy")
+  deletionRequestsMade     DeletionRequest[] @relation("DeletionRequestedBy")
+  deletionRequestsReviewed DeletionRequest[] @relation("DeletionReviewedBy")
+  givingRecordsRecorded    GivingRecord[]    @relation("GivingRecordedBy")
+  givingBatchesCreated     GivingBatch[]     @relation("GivingBatchCreatedBy")
+  registrationsReviewed    SelfRegistration[] @relation("RegistrationReviewedBy")
+  assetsUploaded           Asset[]            @relation("AssetUploadedBy")
+  fixedAssetsAdded         FixedAsset[]       @relation("FixedAssetAddedBy")
+  conditionRequestsMade    AssetConditionRequest[] @relation("ConditionRequestedBy")
+  conditionRequestsAnswered AssetConditionRequest[] @relation("ConditionRespondedBy")
+  fixedAssetEditRequestsMade     FixedAssetEditRequest[] @relation("FixedAssetEditRequestedBy")
+  fixedAssetEditRequestsReviewed FixedAssetEditRequest[] @relation("FixedAssetEditReviewedBy")
+  fellowshipReportsSubmitted     FellowshipReport[] @relation("FellowshipReportSubmittedBy")
+  fellowshipReportsFinanceReviewed FellowshipReport[] @relation("FellowshipReportFinanceReviewedBy")
+  announcementsSent        Announcement[]     @relation("AnnouncementSentBy")
+  requisitionsRequested      FundRequisition[] @relation("RequisitionRequestedBy")
+  requisitionsReviewed       FundRequisition[] @relation("RequisitionReviewedBy")
+  accountabilitiesSubmitted  RequisitionAccountability[] @relation("AccountabilitySubmittedBy")
+  accountabilitiesReviewed   RequisitionAccountability[] @relation("AccountabilityReviewedBy")
+  eventDebriefsSubmitted     EventDebrief[] @relation("EventDebriefSubmittedBy")
+  testimoniesSubmitted       Testimony[] @relation("TestimonySubmittedBy")
+  notifications            Notification[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+enum LeadershipRole {
+  PASTOR
+  DIRECTORATE_LEADER
+  DEPARTMENT_LEADER
+  FELLOWSHIP_LEADER
+  BRANCH_LEADER
+}
+
+enum MemberStatus {
+  VISITOR
+  NEW_CONVERT
+  MEMBER
+  INACTIVE
+}
+
+enum HouseholdRole {
+  HEAD
+  SPOUSE
+  CHILD
+  DEPENDENT
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+/// A family unit. Members join a household with their own role in it --
+/// modeled as its own table (Section 5), not a single FK on member, because
+/// household composition changes independently of any one member's record.
+model Household {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  // A family's own address -- deliberately its own field, not just read live
+  // off the head member, since it can be set even before a head is picked
+  // and can drift from any one member's own address over time.
+  address        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Who heads the household is expressed the same way any other membership
+  // is (Member.householdId + householdRole = HEAD), not a duplicate FK here
+  // -- "members join a household from their own profile" stays true even
+  // when the join happens to be initiated from this screen instead.
+  members Member[]
+
+  @@index([organizationId])
+  @@map("households")
+}
+
+/// A visitor and a member are the same underlying record at different
+/// lifecycle stages (Section 1's "visitor -> convert -> member" path) --
+/// status moves them along it rather than promoting between separate tables.
+/// Tier-1 offline entity: id is client-generatable so a visitor can be
+/// registered with no connectivity (Section 7).
+model Member {
+  id             String    @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  householdId    String?
+  household      Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  householdRole  HouseholdRole?
+  fellowshipId   String?
+  fellowship     Fellowship? @relation(fields: [fellowshipId], references: [id], onDelete: SetNull)
+  orgUnitId      String?
+  orgUnit        OrgUnit?  @relation(fields: [orgUnitId], references: [id], onDelete: SetNull)
+  fullName       String
+  // Auto-allocated from Organization.memberNumberSeq on create (padded,
+  // e.g. "0007") -- nullable and editable so an import or manual correction
+  // can still set/override it without fighting the auto-numbering.
+  memberNumber   String?
+  gender         Gender?
+  nationality    String?
+  // Birthday, not birthdate: month/day are what's usually actually known
+  // and celebrated; birthYear is deliberately separate and optional, since
+  // plenty of real records only ever had month/day to begin with.
+  birthMonth     Int?
+  birthDay       Int?
+  birthYear      Int?
+  maritalStatus  MaritalStatus?
+  isStudent      Boolean?
+  school         String?
+  phone          String?
+  email          String?
+  address        String?
+  status         MemberStatus @default(VISITOR)
+  // A member can hold several leadership positions at once (e.g. a
+  // Directorate Leader who is also a Fellowship Leader) -- a scalar array
+  // rather than a single field, and deliberately separate from `status`
+  // (visitor/member lifecycle) and from User.role (system login access):
+  // most leaders here never get a login at all.
+  leadershipRoles LeadershipRole[] @default([])
+  notes          String?
+  joinedAt       DateTime?
+  // Who added this record -- null for anything predating this field, or
+  // created through a path with no acting user (e.g. a future automated
+  // import). Shown as "--" in the members table when unset.
+  createdById    String?
+  createdBy      User?     @relation("MemberAddedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  version        Int       @default(1)
+  originDeviceId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  followUps         FollowUp[]
+  attendanceRecords AttendanceRecord[]
+  classEnrollments  ClassEnrollment[]
+  givingRecords      GivingRecord[]
+  pledges            Pledge[]
+  fellowshipReportAttendance FellowshipReportAttendee[]
+
+  @@unique([organizationId, memberNumber])
+  @@index([organizationId])
+  @@index([householdId])
+  @@map("members")
+}
+
+enum FollowUpStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// Tier-1 offline entity: a coordinator can log a follow-up note with no
+/// connectivity, id client-generated for idempotent sync (Section 7/10).
+model FollowUp {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  assignedToId   String?
+  assignedTo     User?    @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  status         FollowUpStatus @default(PENDING)
+  notes          String?
+  outcome        String?
+  version        Int      @default(1)
+  originDeviceId String?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([memberId])
+  @@map("follow_ups")
+}
+
+/// Online-only setup action (not Tier-1) -- an Org Admin schedules it ahead
+/// of time, unlike check-in which has to work from the door on a bad connection.
+model Event {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  title          String
+  description    String?
+  location       String?
+  startsAt       DateTime
+  endsAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  attendanceSessions AttendanceSession[]
+  debrief            EventDebrief?
+
+  @@index([organizationId])
+  @@map("events")
+}
+
+/// One occurrence to check attendance against (a Sunday service, a class
+/// session). qrToken drives the "manual + QR" unification (Section 2): the
+/// same check-in screen opens whether an usher taps it or an attendee scans
+/// the session's QR code -- see the /checkin/:token route.
+model AttendanceSession {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  eventId        String?
+  event          Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  classId        String?
+  class          DiscipleshipClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name           String
+  date           DateTime
+  qrToken        String   @unique @default(uuid())
+  createdAt      DateTime @default(now())
+
+  records AttendanceRecord[]
+
+  @@index([organizationId])
+  @@map("attendance_sessions")
+}
+
+/// Tier-1 offline entity, the canonical case for it: an usher's device with
+/// no signal still has to queue check-ins and sync later (Section 7/10).
+/// memberId is set for a known person; visitorName covers a walk-in who
+/// hasn't been registered as a Member yet.
+model AttendanceRecord {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessionId      String
+  session        AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  visitorName    String?
+  checkedInAt    DateTime @default(now())
+  checkedInById  String?
+  checkedInBy    User?    @relation("CheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+  version        Int      @default(1)
+  originDeviceId String?
+
+  @@index([organizationId])
+  @@index([sessionId])
+  @@map("attendance_records")
+}
+
+enum ImportStatus {
+  UPLOADED
+  EXTRACTING
+  READY_FOR_REVIEW
+  COMMITTED
+}
+
+enum ImportRowStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMMITTED
+}
+
+/// Section 7's Import Center. Nothing here is a real member/giving record
+/// until a human approves it in staging and commits -- see ImportStagingRow.
+model ImportBatch {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  filename       String
+  targetEntity   String // "member" for Sprint 3; more entities later
+  status         ImportStatus @default(UPLOADED)
+  usedAi         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  rows ImportStagingRow[]
+
+  @@index([organizationId])
+  @@map("import_batches")
+}
+
+/// One extracted candidate row. extractedFields mirrors CreateMemberInput's
+/// shape loosely -- whatever the mapper or Gemini could fill in -- reviewed
+/// and edited here before ever touching the real members table.
+model ImportStagingRow {
+  id             String          @id @default(uuid())
+  organizationId String
+  importBatchId  String
+  importBatch    ImportBatch     @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  rowIndex       Int
+  extractedFields Json
+  confidence     Float?
+  source         String // "deterministic" | "ai"
+  possibleDuplicateOfId String?
+  status         ImportRowStatus @default(PENDING)
+  createdAt      DateTime        @default(now())
+
+  @@index([importBatchId])
+  @@index([organizationId])
+  @@map("import_staging_rows")
+}
+
+// --- Sprint 4: Ministry structure --------------------------------------
+
+/// A cell group. Section 6: "Fellowship Leader -- own fellowship's members
+/// and attendance" -- membership is the fellowshipId on Member, not a join
+/// table, since a member belongs to at most one fellowship at a time.
+model Fellowship {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name           String
+  leaderId       String?
+  meetingDay     String?
+  meetingTime    String?
+  meetingLocation String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members Member[]
+  reports FellowshipReport[]
+  fundRequisitions FundRequisition[]
+
+  @@index([organizationId])
+  @@map("fellowships")
+}
+
+/// A leader's periodic write-up of one meeting -- attendance, giving,
+/// expenses. The finance fields (givingAmount/expensesAmount) never touch
+/// the ledger on submission; only `approveFinance` posting a GivingRecord
+/// makes the giving side real, so a leader's self-reported numbers can't
+/// inflate Giving until someone with money authority has checked them.
+/// financeStatus reuses DeletionRequestStatus -- same PENDING/APPROVED/
+/// REJECTED shape as every other maker-checker flow in this codebase.
+model FellowshipReport {
+  id                  String   @id @default(uuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fellowshipId        String
+  fellowship          Fellowship @relation(fields: [fellowshipId], references: [id], onDelete: Cascade)
+  // Human-typeable reference (DDMMYYYY + a same-day sequence number, e.g.
+  // "20082026-1") so a paper receipt from a cell meeting can be matched back
+  // to this exact record, and so finance can search across every
+  // fellowship's reports by ref instead of only browsing one at a time.
+  refNumber           String
+  submittedById       String
+  submittedBy         User     @relation("FellowshipReportSubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  meetingDate         DateTime
+  attendanceCount     Int
+  notes               String?
+
+  givingAmount        Decimal? @db.Decimal(14, 2)
+  expensesAmount      Decimal? @db.Decimal(14, 2)
+  expenseNotes        String?
+  currency            String?
+  categoryId          String?
+  category            GivingCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  financeStatus       DeletionRequestStatus @default(PENDING)
+  financeReviewedById String?
+  financeReviewedBy   User?    @relation("FellowshipReportFinanceReviewedBy", fields: [financeReviewedById], references: [id], onDelete: SetNull)
+  financeReviewedAt   DateTime?
+  financeNote         String?
+  givingRecordId      String?  @unique
+  givingRecord        GivingRecord? @relation(fields: [givingRecordId], references: [id], onDelete: SetNull)
+
+  createdAt           DateTime @default(now())
+
+  attendees FellowshipReportAttendee[]
+
+  @@unique([organizationId, refNumber])
+  @@index([organizationId])
+  @@index([fellowshipId])
+  @@map("fellowship_reports")
+}
+
+/// Who from the fellowship's own member roster was at the meeting -- a real
+/// join table (not a JSON blob) so per-member attendance can be queried
+/// later, the same reasoning as AttendanceRecord elsewhere in this schema.
+model FellowshipReportAttendee {
+  id       String   @id @default(uuid())
+  reportId String
+  report   FellowshipReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  memberId String
+  member   Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, memberId])
+  @@map("fellowship_report_attendees")
+}
+
+enum OrgUnitType {
+  DIRECTORATE
+  DEPARTMENT
+}
+
+/// Directorate/department hierarchy (Section 5's org_units idea, scoped to
+/// what Sprint 4 needs): a DEPARTMENT's parentId points at a DIRECTORATE:
+/// a DIRECTORATE's parentId is null. Two levels, self-referencing so a
+/// department always belongs to exactly one directorate.
+model OrgUnit {
+  id             String      @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  parentId       String?
+  parent         OrgUnit?    @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children       OrgUnit[]   @relation("OrgUnitHierarchy")
+  type           OrgUnitType
+  name           String
+  headId         String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  members Member[]
+  fundRequisitions FundRequisition[]
+
+  @@index([organizationId])
+  @@index([parentId])
+  @@map("org_units")
+}
+
+/// A track, e.g. "Foundations" or "Leadership" -- the umbrella a class runs under.
+model DiscipleshipProgram {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+
+  classes DiscipleshipClass[]
+
+  @@index([organizationId])
+  @@map("discipleship_programs")
+}
+
+/// One cohort/run of a program. Attendance reuses AttendanceSession/Record
+/// directly (classId on AttendanceSession) rather than a parallel system --
+/// a class session is not conceptually different from a service occurrence.
+model DiscipleshipClass {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        DiscipleshipProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name           String
+  instructorId   String?
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime @default(now())
+
+  enrollments        ClassEnrollment[]
+  attendanceSessions AttendanceSession[]
+
+  @@index([organizationId])
+  @@index([programId])
+  @@map("discipleship_classes")
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  COMPLETED
+  DROPPED
+}
+
+model ClassEnrollment {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  classId        String
+  class          DiscipleshipClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus @default(ENROLLED)
+  enrolledAt     DateTime @default(now())
+
+  @@unique([classId, memberId])
+  @@index([organizationId])
+  @@map("class_enrollments")
+}
+
+// --- Deletion approval (maker-checker) ----------------------------------
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A "delete" click never deletes -- it files this instead. Polymorphic by
+/// entityType/entityId (like the blueprint's own audit_logs pattern, Section
+/// 5) so approval-gated deletion works the same way for every entity type,
+/// not just members; entityLabel is a snapshot so the request still reads
+/// sensibly even if the underlying record is gone by the time it's reviewed.
+model DeletionRequest {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entityType     String
+  entityId       String
+  entityLabel    String
+  requestedById  String
+  requestedBy    User     @relation("DeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  status         DeletionRequestStatus @default(PENDING)
+  reviewedById   String?
+  reviewedBy     User?    @relation("DeletionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("deletion_requests")
+}
+
+// --- Sprint 5: Money & reporting ----------------------------------------
+
+enum GivingMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CHEQUE
+  OTHER
+}
+
+/// A fund giving is recorded against (tithe, offering, building fund...).
+/// Org Admin manages the list; a Finance Officer records against it.
+/// Two levels, self-referencing (a subcategory's parentId points at a
+/// top-level category; a top-level category's parentId is null) -- mirrors
+/// how a church's own chart of accounts is usually organized (e.g.
+/// "Administrative" > "Office Supplies", "Printing & Copying").
+model GivingCategory {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         GivingCategory?  @relation("GivingCategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children       GivingCategory[] @relation("GivingCategoryHierarchy")
+  name           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  records GivingRecord[]
+  fellowshipReports FellowshipReport[]
+
+  @@index([organizationId])
+  @@index([parentId])
+  @@map("giving_categories")
+}
+
+/// A designated pool of money (Building Fund, Missions Fund...) -- distinct
+/// from GivingCategory, which is *what kind* of income/expense something is;
+/// a fund is *which pot* it counts toward. Orthogonal on purpose: a gift can
+/// be categorized "Designated Gift" and allocated to the "Building Fund" at
+/// the same time.
+model Fund {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  targetAmount   Decimal? @db.Decimal(14, 2)
+  // Optional time-box for a fundraising campaign (e.g. "Building Fund --
+  // Phase 1, done by Dec 2026") -- null means an open-ended designated pool
+  // with no deadline, which is most funds.
+  deadlineDate   DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  records GivingRecord[]
+  pledges Pledge[]
+
+  @@index([organizationId])
+  @@map("funds")
+}
+
+enum PartnerType {
+  PERSON
+  ORGANIZATION
+  CHURCH
+}
+
+/// An external giver -- not a Member of this church, but a person,
+/// organization, or sister church that gives financially. Kept as its own
+/// entity (not shoehorned into Member) since a Partner never has a
+/// household/fellowship/attendance history, only a giving one.
+model Partner {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  type           PartnerType @default(PERSON)
+  contactEmail   String?
+  contactPhone   String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  records GivingRecord[]
+  pledges Pledge[]
+
+  @@index([organizationId])
+  @@map("partners")
+}
+
+/// A church's own payees -- who money goes out to (a vendor, a contractor,
+/// a utility company). Not tied to expenses yet (no expense-tracking table
+/// exists), but kept as its own lookup so Accounting has somewhere to point
+/// once it does.
+model Vendor {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  contactEmail   String?
+  contactPhone   String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("vendors")
+}
+
+enum PledgeFrequency {
+  ONE_TIME
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum PledgeStatus {
+  ACTIVE
+  FULFILLED
+  ARCHIVED
+}
+
+/// A member's (or Partner's -- exactly one of the two is set) commitment to
+/// give a total amount over a period. Fulfilled amount is derived (sum of
+/// GivingRecords with this pledgeId), not stored, so it's never out of sync
+/// with the actual giving history. `status` is the one piece of the
+/// lifecycle that genuinely needs to be stored: a background check
+/// (mirroring the birthday-reminder interval job) flips ACTIVE -> FULFILLED
+/// once the derived total meets the pledge, or ACTIVE -> ARCHIVED once
+/// `endDate` is far enough in the past with the pledge still unmet.
+model Pledge {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  partnerId      String?
+  partner        Partner? @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  fundId         String?
+  fund           Fund?    @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  amount         Decimal  @db.Decimal(14, 2)
+  currency       String
+  frequency      PledgeFrequency @default(ONE_TIME)
+  status         PledgeStatus @default(ACTIVE)
+  startDate      DateTime
+  endDate        DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  records GivingRecord[]
+
+  @@index([organizationId])
+  @@index([memberId])
+  @@map("pledges")
+}
+
+enum BatchStatus {
+  OPEN
+  CLOSED
+}
+
+/// Groups the giving recorded from one collection (a Sunday service, an
+/// event) so it can be reconciled against what was actually counted --
+/// `declaredTotal` is what the counters said the collection added up to;
+/// the sum of this batch's GivingRecords is what actually got entered.
+/// Closing a batch is the reconciliation checkpoint, not a hard lock.
+model GivingBatch {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  batchDate      DateTime
+  declaredTotal  Decimal? @db.Decimal(14, 2)
+  currency       String
+  status         BatchStatus @default(OPEN)
+  createdById    String?
+  createdBy      User?    @relation("GivingBatchCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  records GivingRecord[]
+
+  @@index([organizationId])
+  @@map("giving_batches")
+}
+
+/// Manual entry today (Section 8: "Manual giving entry -- Day 90"). `method`
+/// already distinguishes cash/bank/mobile money, and `providerRef` is
+/// reserved for a MTN MoMo/Airtel driver's transaction id -- the
+/// provider-adapter interface fast-follows on this same table, so giving's
+/// data model never has to change when that driver lands.
+model GivingRecord {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  categoryId     String
+  category       GivingCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  fundId         String?
+  fund           Fund?    @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  pledgeId       String?
+  pledge         Pledge?  @relation(fields: [pledgeId], references: [id], onDelete: SetNull)
+  batchId        String?
+  batch          GivingBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  memberId       String?
+  member         Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  partnerId      String?
+  partner        Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  giverName      String?
+  amount         Decimal  @db.Decimal(14, 2)
+  currency       String
+  method         GivingMethod @default(CASH)
+  providerRef    String?
+  givenAt        DateTime @default(now())
+  recordedById   String?
+  recordedBy     User?    @relation("GivingRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  fellowshipReport FellowshipReport?
+
+  @@index([organizationId])
+  @@index([categoryId])
+  @@index([givenAt])
+  @@map("giving_records")
+}
+
+// --- Sprint 5: In-app notifications --------------------------------------
+
+/// Fired by services on events another user needs to know about (a deletion
+/// request filed, approved, or rejected). Polymorphic-free and deliberately
+/// simple: one row per recipient, `link` is a client-side route to jump to.
+model Notification {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String
+  message        String
+  link           String?
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("notifications")
+}
+
+/// A record of one broadcast -- who sent it, to how many people, and what
+/// audience filter was used. The actual delivery still rides the existing
+/// Notification table (one row per recipient User); this is the audit trail
+/// on top, since a broadcast itself has no single "read" state to track.
+/// Reaches logged-in staff Users only -- there's no SMS/email/WhatsApp
+/// provider wired up yet, so this can't reach the congregation (Members)
+/// directly, only whoever has a portal account.
+model Announcement {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  senderId       String?
+  sender         User?    @relation("AnnouncementSentBy", fields: [senderId], references: [id], onDelete: SetNull)
+  message        String
+  link           String?
+  audienceLabel  String
+  recipientCount Int
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("announcements")
+}
+
+// --- Self-registration --------------------------------------------------
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A visitor filling out the public /register/:slug form has no account and
+/// no session -- this is what they write to, not the members table directly.
+/// Mirrors DeletionRequest's maker-checker shape: nothing becomes a real
+/// Member until an appointed approver (isRegistrationApprover) reviews it.
+model SelfRegistration {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName       String
+  phone          String?
+  email          String?
+  gender         Gender?
+  nationality    String?
+  birthMonth     Int?
+  birthDay       Int?
+  birthYear      Int?
+  maritalStatus  MaritalStatus?
+  isStudent      Boolean?
+  school         String?
+  address        String?
+  notes          String?
+  status         RegistrationStatus @default(PENDING)
+  reviewedById   String?
+  reviewedBy     User?    @relation("RegistrationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  memberIdCreated String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("self_registrations")
+}
+
+// --- Church assets --------------------------------------------------------
+
+/// Photos, logos, flyers, documents -- stored as bytes directly on the row
+/// (Bytes, not base64 text: no ~33% encoding overhead), the same pattern
+/// Organization.logoUrl already established, since no object storage
+/// (S3/OCI) exists yet. Images are expected to already be optimized
+/// client-side (resized/recompressed) before upload -- this table doesn't
+/// do that itself.
+model Asset {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  mimeType       String
+  sizeBytes      Int
+  data           Bytes
+  uploadedById   String?
+  uploadedBy     User?    @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  conditionPhotos AssetConditionPhoto[]
+  avatarOfUsers   User[] @relation("UserAvatar")
+  requisitionReceipts RequisitionReceipt[]
+
+  @@index([organizationId])
+  @@map("assets")
+}
+
+// --- Fixed asset register --------------------------------------------------
+
+enum FixedAssetCategory {
+  LAND
+  BUILDING
+  EQUIPMENT
+  VEHICLE
+  FURNITURE
+  OTHER
+}
+
+/// Condition is a fixed vocabulary, not free text, so a Senior Pastor
+/// scanning many assets/branches can compare like-for-like at a glance.
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  NEEDS_REPAIR
+  DISPOSED
+}
+
+/// The register itself -- land, buildings, equipment, whatever the church
+/// actually owns. `currentCondition` starts equal to conditionAtAcquisition
+/// and only ever changes when an AssetConditionRequest gets a response, so
+/// it's always the latest confirmed state, not a guess.
+model FixedAsset {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name           String
+  category       FixedAssetCategory
+  description    String?
+  acquisitionDate     DateTime
+  acquisitionCost     Decimal  @db.Decimal(14, 2)
+  currency            String
+  // Annual straight-line rate, e.g. 10 means 10%/year -- optional since not
+  // every asset depreciates (land, notably, conventionally doesn't).
+  depreciationRatePercent Float?
+  conditionAtAcquisition AssetCondition
+  currentCondition       AssetCondition
+  createdById    String?
+  createdBy      User?    @relation("FixedAssetAddedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conditionRequests AssetConditionRequest[]
+  editRequests      FixedAssetEditRequest[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("fixed_assets")
+}
+
+/// Maker-checker for editing the register itself (Section 6's approval
+/// pattern, applied here too): a proposed change sits as JSON until an
+/// appointed approver reviews it -- the same reviewer gate DeletionRequest
+/// uses (isDeletionApprover or ORG_ADMIN, never the requester themself) --
+/// and only approval actually calls FixedAssetsService.update().
+model FixedAssetEditRequest {
+  id              String   @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fixedAssetId    String
+  fixedAsset      FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  requestedById   String
+  requestedBy     User     @relation("FixedAssetEditRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  proposedChanges Json
+  note            String?
+  status          DeletionRequestStatus @default(PENDING)
+  reviewedById    String?
+  reviewedBy      User?    @relation("FixedAssetEditReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([fixedAssetId])
+  @@map("fixed_asset_edit_requests")
+}
+
+enum ConditionRequestStatus {
+  PENDING
+  RESPONDED
+}
+
+/// A Senior Pastor/Admin "please check on this" ask, and the branch's own
+/// response -- one row for both ends (request fields always set, response
+/// fields null until answered), matching the same shape DeletionRequest and
+/// SelfRegistration already use in this codebase rather than a separate
+/// response table for what's fundamentally one exchange.
+model AssetConditionRequest {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fixedAssetId   String
+  fixedAsset     FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  requestedById  String
+  requestedBy    User     @relation("ConditionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  message        String?
+  status         ConditionRequestStatus @default(PENDING)
+  createdAt      DateTime @default(now())
+
+  respondedById       String?
+  respondedBy         User?    @relation("ConditionRespondedBy", fields: [respondedById], references: [id], onDelete: SetNull)
+  responseCondition   AssetCondition?
+  responseDescription String?
+  respondedAt         DateTime?
+
+  photos         AssetConditionPhoto[]
+
+  @@index([organizationId])
+  @@index([fixedAssetId])
+  @@map("asset_condition_requests")
+}
+
+/// Links a condition response to however many photos were attached --
+/// reuses the existing Asset blob store (same optimize-before-upload path
+/// the media library already uses) rather than a parallel file table.
+model AssetConditionPhoto {
+  id         String   @id @default(uuid())
+  requestId  String
+  request    AssetConditionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_condition_photos")
+}
+
+// --- Fund requisition -> accountability (two-phase money-out workflow) ----
+
+enum RequisitionStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+/// Phase 1 of "money out, then prove how it was spent" -- a genuinely
+/// different shape than a straight Giving/expense entry. A leader asks for
+/// funds for a stated reason; finance approves or rejects before anything is
+/// notionally disbursed. Phase 2 (RequisitionAccountability) is the leader
+/// later reporting what it was actually spent on, reviewed separately.
+model FundRequisition {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedById  String
+  requestedBy    User     @relation("RequisitionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     OrgUnit? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  fellowshipId   String?
+  fellowship     Fellowship? @relation(fields: [fellowshipId], references: [id], onDelete: SetNull)
+  amount         Decimal  @db.Decimal(14, 2)
+  currency       String
+  reason         String
+  status         RequisitionStatus @default(REQUESTED)
+  reviewedById   String?
+  reviewedBy     User?    @relation("RequisitionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  reviewNote     String?
+  createdAt      DateTime @default(now())
+
+  accountability RequisitionAccountability?
+
+  @@index([organizationId])
+  @@map("fund_requisitions")
+}
+
+/// Phase 2 -- only ever filed against an already-APPROVED requisition. One
+/// row per requisition (1-1), reusing DeletionRequestStatus for its own
+/// separate approval, same maker-checker idea applied one step further down
+/// the chain.
+model RequisitionAccountability {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requisitionId  String   @unique
+  requisition    FundRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  submittedById  String
+  submittedBy    User     @relation("AccountabilitySubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  amountSpent    Decimal  @db.Decimal(14, 2)
+  description    String
+  status         DeletionRequestStatus @default(PENDING)
+  reviewedById   String?
+  reviewedBy     User?    @relation("AccountabilityReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  reviewNote     String?
+  createdAt      DateTime @default(now())
+
+  receipts RequisitionReceipt[]
+
+  @@index([organizationId])
+  @@map("requisition_accountabilities")
+}
+
+/// Receipt photos for an accountability submission -- reuses the generic
+/// Asset blob store, same pattern as AssetConditionPhoto.
+model RequisitionReceipt {
+  id               String   @id @default(uuid())
+  accountabilityId String
+  accountability   RequisitionAccountability @relation(fields: [accountabilityId], references: [id], onDelete: Cascade)
+  assetId          String
+  asset            Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("requisition_receipts")
+}
+
+// --- Event debrief ---------------------------------------------------------
+
+/// Filed after an event happens -- a concrete report type distinct from
+/// creating the event itself, notifying broadly rather than just the
+/// creator. One per event (1-1); whoever manages Events fills it in.
+model EventDebrief {
+  id              String   @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventId         String   @unique
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  submittedById   String
+  submittedBy     User     @relation("EventDebriefSubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  venue           String?
+  actualAttendance Int?
+  ministers       String?
+  strengths       String?
+  challenges      String?
+  recommendations String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("event_debriefs")
+}
+
+// --- Testimonies -------------------------------------------------------
+
+enum TestimonyCategory {
+  SALVATION
+  HEALING
+  FINANCIAL_BREAKTHROUGH
+  EMPLOYMENT
+  RESTORATION
+  SPIRITUAL_GROWTH
+  ACADEMIC
+  OTHER
+}
+
+/// A cheap, high-warmth community feature -- any signed-in user posts a
+/// categorized testimony, everyone reads the feed, only an Org Admin can
+/// remove one (no edit -- if it's wrong, take it down and repost).
+model Testimony {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  submittedById  String
+  submittedBy    User     @relation("TestimonySubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  category       TestimonyCategory
+  content        String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@map("testimonies")
+}

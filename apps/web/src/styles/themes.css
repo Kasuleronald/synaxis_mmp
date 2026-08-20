@@ -1,0 +1,136 @@
+/* Section 11 of the blueprint: 5 themes, each a light/dark token pair, never
+   a single fixed color. data-theme picks the hue family; data-mode picks
+   light/dark within it. Shell surfaces (bg/surface/ink) are shared across
+   all 5 themes on purpose -- only the accent family changes -- so a church's
+   brand feels distinct without the UI itself feeling like 5 different apps. */
+
+:root {
+  --bg: #f7f8f6;
+  --surface: #ffffff;
+  --surface-2: #eef2ec;
+  --ink: #16201b;
+  --ink-muted: #4b564f;
+  --line: #dce3da;
+  --line-soft: #e7ece4;
+  --danger: #a23b3b;
+  --danger-soft: #f6e4e1;
+  --warn: #95611f;
+  --warn-soft: #f7ecdd;
+}
+
+[data-mode="dark"] {
+  --bg: #0e1712;
+  --surface: #131f19;
+  --surface-2: #192720;
+  --ink: #e9f0ea;
+  --ink-muted: #a9b8ad;
+  --line: #25352c;
+  --line-soft: #1d2b23;
+  --danger: #e38c8c;
+  --danger-soft: #3a1e1e;
+  --warn: #e3ac63;
+  --warn-soft: #3a2b14;
+}
+
+/* Each theme also fixes a --sidebar-bg -- deliberately the SAME rich shade
+   in both light and dark page mode, not mode-nested like the tokens above.
+   The sidebar is the one surface meant to read as "this church's color"
+   at a glance regardless of which mode the user's device is in; --sidebar-*
+   text tokens are opacity-stepped white, chosen for contrast against that
+   fixed dark fill rather than swapped per mode. */
+
+/* Growth -- default. Renewal; the platform's own root idea. */
+[data-theme="growth"] {
+  --accent: #1b7a57;
+  --accent-ink: #0e4b34;
+  --accent-soft: #e3f1ea;
+  --sidebar-bg: #0e4b34;
+}
+[data-theme="growth"][data-mode="dark"] {
+  --accent: #54c293;
+  --accent-ink: #bfebd4;
+  --accent-soft: #17352a;
+}
+
+/* Heritage -- dignified, liturgical, trust. */
+[data-theme="heritage"] {
+  --accent: #2a3b7c;
+  --accent-ink: #1c2a5e;
+  --accent-soft: #e7e9f6;
+  --sidebar-bg: #1c2a5e;
+}
+[data-theme="heritage"][data-mode="dark"] {
+  --accent: #7c8fe0;
+  --accent-ink: #c7cef5;
+  --accent-soft: #232b4c;
+}
+
+/* Ember -- warm, evangelistic energy. */
+[data-theme="ember"] {
+  --accent: #c1502e;
+  --accent-ink: #8a3a20;
+  --accent-soft: #fbe8e0;
+  --sidebar-bg: #8a3a20;
+}
+[data-theme="ember"][data-mode="dark"] {
+  --accent: #e8895f;
+  --accent-ink: #f6cdb6;
+  --accent-soft: #3a2417;
+}
+
+/* Regal -- worship, celebration. */
+[data-theme="regal"] {
+  --accent: #6b3fa0;
+  --accent-ink: #4c2c73;
+  --accent-soft: #efe6f8;
+  --sidebar-bg: #4c2c73;
+}
+[data-theme="regal"][data-mode="dark"] {
+  --accent: #b48fe0;
+  --accent-ink: #ded0f2;
+  --accent-soft: #2c2140;
+}
+
+/* Slate -- minimal, corporate, multi-campus. */
+[data-theme="slate"] {
+  --accent: #1e6e6e;
+  --accent-ink: #164f4f;
+  --accent-soft: #e2f1f1;
+  --sidebar-bg: #164f4f;
+}
+[data-theme="slate"][data-mode="dark"] {
+  --accent: #5fc2c2;
+  --accent-ink: #bfe9e9;
+  --accent-soft: #17302f;
+}
+
+:root {
+  --sidebar-ink: #ffffff;
+  --sidebar-ink-muted: rgba(255, 255, 255, 0.68);
+  --sidebar-line: rgba(255, 255, 255, 0.16);
+  --sidebar-hover: rgba(255, 255, 255, 0.1);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.18);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Sidebar polish (Aug 2026): faint separators between nav items, inset via
+   a pseudo-element rather than a real border so the line never touches the
+   sidebar's own edges -- a plain border-top would run edge to edge. */
+.sidebar-nav > * + * {
+  position: relative;
+  margin-top: 0.375rem;
+  padding-top: 0.5rem;
+}
+.sidebar-nav > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 1px;
+  background: var(--sidebar-line);
+}
