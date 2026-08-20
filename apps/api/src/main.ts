@@ -19,6 +19,13 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true, limit: "2mb" }));
   const config = app.get(ConfigService);
 
+  // Every API route lives under /api in both dev and prod -- in dev, Vite's
+  // proxy forwards /api/* here unchanged (vite.config.ts); in prod, this is
+  // what lets one process serve both the built SPA and the API on the same
+  // origin/port, with ServeStaticModule (app.module.ts) handling everything
+  // that isn't /api*.
+  app.setGlobalPrefix("api");
+
   app.enableCors({
     origin: config.get<string>("WEB_ORIGIN", "http://localhost:5173"),
     credentials: true,

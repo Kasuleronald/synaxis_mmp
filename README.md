@@ -2,7 +2,7 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-20, ~19:30 (a batch of features ported in from your older "My Church MVP" project: Partners, Fund requisitions/accountability, Testimonies, Event debriefs, Pledge lifecycle, command palette, branded PDF exports, and a few security/UX patterns confirmed already solid)
+**Last updated:** 2026-08-20, ~21:00 (pushed to GitHub, made the app production-ready for Webuzo -- see `DEPLOY.md`)
 
 ## Running it locally
 
@@ -19,6 +19,19 @@ cd apps/web && npm run dev                  # web on :5173
 **Login credentials:**
 - Platform Admin: `admin@lifemmp.local` / `LifeMmp!2026` (displays as "Kasule Ronald")
 - Your org admin login: `balayobrianevans45@gmail.com` (password as you set it)
+
+## Deploying
+
+Code lives at `github.com/Kasuleronald/synaxis_mmp`. Full step-by-step for
+getting it running on your Webuzo VPS at `synaxis.scholarsas.com` is in
+**`DEPLOY.md`** — covers the Postgres setup (including the restricted RLS
+role, not optional), `.env`, the build/migrate steps, wiring up Webuzo's
+Node.js Selector, and turning on SSL (login won't work without it — session
+cookies require HTTPS once `NODE_ENV=production`).
+
+The app itself is now shaped for this: one Node process serves both the
+built React app and the API (`/api/*`) on one port, so Webuzo only needs a
+single Node.js app configured, not two.
 
 ## What's implemented
 
@@ -146,7 +159,7 @@ You asked me to review your older `My Church MVP` project and bring over what's 
 
 ## Known limitations / things that need you
 
-- **Oracle Cloud cutover (Sprint 6)**: needs real OCI credentials, DNS setup for `church.scholarsas.com`, and your direct involvement — not something I can do autonomously. Everything else in Sprint 6 that's locally actionable (security/isolation testing, bug fixing) is being worked through.
+- **Hosting**: the plan settled on Webuzo (not Oracle Cloud) for `synaxis.scholarsas.com` — see `DEPLOY.md` for the full step-by-step. The repo is now on GitHub (`github.com/Kasuleronald/synaxis_mmp`) and the app is production-ready (built React app + API served from one Node process, `/api` prefix consistent in both dev and prod) — the remaining steps (Postgres setup, `.env`, SSL) need your hands on the actual Webuzo panel, which I don't have access to.
 - **No email sending yet**: password reset and self-registration notifications rely on in-app links/bell, not actual emails. Would need an email provider (SendGrid, SES, etc.) and credentials from you. This is the same reason Communications/Announcements can only reach staff with a login, not the wider congregation.
 - **Accounting is a simple register, not double-entry bookkeeping** — a deliberate scope choice (see Finance section above), not an oversight.
 - **Assets stored in Postgres, not object storage**: fine for now, but should move to real file storage (S3-compatible or OCI Object Storage) before this scales to many large files — flagging so it doesn't get forgotten.

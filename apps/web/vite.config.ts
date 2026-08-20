@@ -16,10 +16,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // No rewrite -- the API's global prefix (main.ts) is /api in both dev
+      // and prod, so this forwards the path unchanged rather than stripping
+      // it, keeping the two environments consistent.
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },

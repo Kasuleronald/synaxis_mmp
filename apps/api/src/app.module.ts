@@ -1,5 +1,7 @@
+import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ServeStaticModule } from "@nestjs/serve-static";
 import { AppController } from "./app.controller";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
@@ -32,6 +34,19 @@ import { TestimoniesModule } from "./testimonies/testimonies.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Production only -- local dev always serves the web app through Vite
+    // on its own port instead, so apps/web/dist may not even exist locally.
+    // `/api*` is excluded since main.ts sets that as the API's global
+    // prefix; everything else falls through to the built SPA, with
+    // index.html as the fallback for client-side routes.
+    ...(process.env.NODE_ENV === "production"
+      ? [
+          ServeStaticModule.forRoot({
+            rootPath: join(__dirname, "..", "..", "web", "dist"),
+            exclude: ["/api*"],
+          }),
+        ]
+      : []),
     PrismaModule,
     AuthModule,
     OrganizationsModule,
