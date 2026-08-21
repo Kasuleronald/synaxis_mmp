@@ -35,6 +35,18 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true, limit: "2mb" }));
   const config = app.get(ConfigService);
 
+  // Webuzo's reverse proxy (LiteSpeed) terminates TLS and forwards to this
+  // process over plain HTTP -- without this, Express sees every request as
+  // insecure regardless of what the browser actually connected over, so the
+  // secure:true session cookie below is silently never set at all (not just
+  // missing the flag -- express-session drops the whole Set-Cookie).
+  // Confirmed directly: the session was being created and persisted to
+  // Postgres correctly, but no Set-Cookie header ever reached the client,
+  // even hitting the app's internal port directly. This makes req.secure
+  // (and req.ip) trust the proxy's X-Forwarded-Proto/X-Forwarded-For
+  // headers instead of the raw socket.
+  app.set("trust proxy", 1);
+
   // Every API route lives under /api in both dev and prod -- in dev, Vite's
   // proxy forwards /api/* here unchanged (vite.config.ts); in prod, this is
   // what lets one process serve both the built SPA and the API on the same
