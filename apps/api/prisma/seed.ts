@@ -7,11 +7,14 @@ import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import "dotenv/config";
 
-// Uses the superuser connection, not RUNTIME_DATABASE_URL -- the restricted
-// role is subject to row-level security, and this insert has no tenant
-// context (organizationId is null) to satisfy it.
+// RUNTIME_DATABASE_URL (the restricted role), same as the running app --
+// bypassing RLS here isn't a superuser privilege, it's the same
+// app.is_platform_admin session GUC that runWithTenant (src/prisma/tenant.ts)
+// sets for every other platform-admin operation. There is no separate
+// "superuser bypasses RLS" path: FORCE ROW LEVEL SECURITY is set on `users`,
+// so even the table owner is subject to the same policies.
 const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
+  datasourceUrl: process.env.RUNTIME_DATABASE_URL,
 });
 
 async function main() {
@@ -19,26 +22,33 @@ async function main() {
   const password = requireEnv("PLATFORM_ADMIN_PASSWORD");
   const fullName = process.env.PLATFORM_ADMIN_NAME ?? "Platform Administrator";
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    console.log(`Platform Administrator ${email} already exists -- nothing to do.`);
-    return;
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.current_org_id', '', true)`;
+    await tx.$executeRaw`SELECT set_config('app.is_platform_admin', 'true', true)`;
+    await tx.$executeRaw`SELECT set_config('app.public_checkin', 'false', true)`;
+    await tx.$executeRaw`SELECT set_config('app.public_registration', 'false', true)`;
 
-  const passwordHash = await bcrypt.hash(password, 12);
-  const admin = await prisma.user.create({
-    data: {
-      email,
-      fullName,
-      passwordHash,
-      role: "PLATFORM_ADMIN",
-      organizationId: null,
-      branchId: null,
-    },
+    const existing = await tx.user.findUnique({ where: { email } });
+    if (existing) {
+      console.log(`Platform Administrator ${email} already exists -- nothing to do.`);
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const admin = await tx.user.create({
+      data: {
+        email,
+        fullName,
+        passwordHash,
+        role: "PLATFORM_ADMIN",
+        organizationId: null,
+        branchId: null,
+      },
+    });
+
+    console.log(`Created Platform Administrator ${admin.email} (${admin.id}).`);
+    console.log("Log in with the PLATFORM_ADMIN_EMAIL / PLATFORM_ADMIN_PASSWORD from your .env, then change the password.");
   });
-
-  console.log(`Created Platform Administrator ${admin.email} (${admin.id}).`);
-  console.log("Log in with the PLATFORM_ADMIN_EMAIL / PLATFORM_ADMIN_PASSWORD from your .env, then change the password.");
 }
 
 function requireEnv(name: string): string {
