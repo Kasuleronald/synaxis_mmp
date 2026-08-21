@@ -16,7 +16,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useOrg } from "../context/OrgContext";
 import { useTerminology } from "../hooks/useTerminology";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
 import { exportMembersToExcel, exportMembersToPdf } from "../lib/export";
@@ -99,6 +99,7 @@ export function MembersPage() {
   });
   const [showForm, setShowForm] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [memberNumber, setMemberNumber] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -124,6 +125,7 @@ export function MembersPage() {
   const [discipleshipClasses, setDiscipleshipClasses] = useState<DiscipleshipClassDto[]>([]);
   const [discipleshipClassId, setDiscipleshipClassId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -183,6 +185,7 @@ export function MembersPage() {
 
   function resetForm() {
     setFullName("");
+    setMemberNumber("");
     setGender("");
     setPhone(orgDialCode ? `${orgDialCode} ` : "");
     setEmail("");
@@ -206,6 +209,7 @@ export function MembersPage() {
     setDiscipleshipClassId("");
     setDuplicateWarning(null);
     setDuplicateConfirmed(false);
+    setFormError(null);
   }
 
   async function onConfirmDuplicate() {
@@ -246,6 +250,7 @@ export function MembersPage() {
   }
 
   async function createMember() {
+    setFormError(null);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const member: MemberDto = {
@@ -253,7 +258,7 @@ export function MembersPage() {
       organizationId: "", // filled server-side; not needed for local display
       branchId: null,
       createdById: null,
-      memberNumber: null, // server-allocated; picked up once synced
+      memberNumber: memberNumber.trim() || null, // otherwise server-allocated; picked up once synced
       householdId: householdId || null,
       householdRole: householdId ? householdRole || null : null,
       fellowshipId: fellowshipId || null,
@@ -280,6 +285,7 @@ export function MembersPage() {
     const payload = {
       id,
       fullName,
+      memberNumber: memberNumber.trim() || undefined,
       gender: gender || undefined,
       phone: phone || undefined,
       email: email || undefined,
@@ -318,8 +324,17 @@ export function MembersPage() {
           // rather than through the offline outbox -- best-effort only.
           await api.post(`/discipleship/classes/${discipleshipClassId}/enroll`, { memberId: id }).catch(() => {});
         }
-      } catch {
-        // Fall through to the offline queue below.
+      } catch (err) {
+        // A real response from the server (e.g. a duplicate member number)
+        // means the request reached it and was rejected -- that's not the
+        // "offline, queue it" case, so surface it and stop instead of
+        // silently queuing a write that will fail to sync forever.
+        if (err instanceof ApiError) {
+          await db.members.delete(id);
+          setFormError(err.message);
+          return;
+        }
+        // Otherwise a genuine network failure -- fall through to the offline queue below.
       }
     }
     if (!createdDirectly) {
@@ -450,6 +465,16 @@ export function MembersPage() {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Member number</label>
+            <input
+              value={memberNumber}
+              onChange={(e) => setMemberNumber(e.target.value)}
+              placeholder="Auto-assigned if left blank"
               className="w-full rounded-md border px-3 py-2 text-sm"
               style={{ borderColor: "var(--line)" }}
             />
@@ -747,6 +772,15 @@ export function MembersPage() {
               ))}
             </div>
           </div>
+
+          {formError && (
+            <div
+              className="sm:col-span-2 rounded-md px-3 py-2 text-sm"
+              style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+            >
+              {formError}
+            </div>
+          )}
 
           {duplicateWarning && (
             <div

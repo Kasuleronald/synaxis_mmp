@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { CreateMemberDto } from "./dto/create-member.dto";
@@ -23,12 +23,37 @@ export class MembersService {
       const alreadyExists = await tx.member.findUnique({ where: { id }, select: { id: true } });
       let memberNumber = rest.memberNumber;
       if (!alreadyExists && !memberNumber) {
-        const org = await tx.organization.update({
-          where: { id: ctx.organizationId as string },
-          data: { memberNumberSeq: { increment: 1 } },
-          select: { memberNumberSeq: true },
+        // The counter only advances on auto-allocation, so a manually
+        // assigned number (which never touches it) can otherwise collide
+        // with one this would produce later -- loop past any number
+        // that's already taken rather than crashing on the DB's unique
+        // constraint. Manual entries are typically sparse, so this almost
+        // always finds a free number on the first try.
+        let candidate: string;
+        let taken: { id: string } | null;
+        do {
+          const org = await tx.organization.update({
+            where: { id: ctx.organizationId as string },
+            data: { memberNumberSeq: { increment: 1 } },
+            select: { memberNumberSeq: true },
+          });
+          candidate = String(org.memberNumberSeq).padStart(4, "0");
+          taken = await tx.member.findUnique({
+            where: { organizationId_memberNumber: { organizationId: ctx.organizationId as string, memberNumber: candidate } },
+            select: { id: true },
+          });
+        } while (taken);
+        memberNumber = candidate;
+      } else if (!alreadyExists && memberNumber) {
+        // Manually assigned (not auto-allocated) -- check it doesn't collide
+        // with another member before hitting the DB's unique constraint, so
+        // the caller gets a clear reason instead of a raw Prisma error.
+        const conflict = await tx.member.findUnique({
+          where: { organizationId_memberNumber: { organizationId: ctx.organizationId as string, memberNumber } },
         });
-        memberNumber = String(org.memberNumberSeq).padStart(4, "0");
+        if (conflict) {
+          throw new ConflictException(`Member number ${memberNumber} is already assigned to ${conflict.fullName}.`);
+        }
       }
       let member = await tx.member.upsert({
         where: { id },
@@ -52,6 +77,14 @@ export class MembersService {
   async update(ctx: TenantContext, id: string, dto: UpdateMemberDto) {
     const { spouseMemberId, ...rest } = dto;
     return runWithTenant(this.prisma, ctx, async (tx) => {
+      if (rest.memberNumber) {
+        const conflict = await tx.member.findUnique({
+          where: { organizationId_memberNumber: { organizationId: ctx.organizationId as string, memberNumber: rest.memberNumber } },
+        });
+        if (conflict && conflict.id !== id) {
+          throw new ConflictException(`Member number ${rest.memberNumber} is already assigned to ${conflict.fullName}.`);
+        }
+      }
       let member = await tx.member.update({ where: { id }, data: rest });
       if (spouseMemberId) {
         if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");

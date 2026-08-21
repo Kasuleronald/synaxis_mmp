@@ -113,6 +113,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
   const [mode, setMode] = useState<"view" | "edit" | "confirmDelete">(initialMode ?? "view");
 
   const [fullName, setFullName] = useState(initial.fullName);
+  const [memberNumber, setMemberNumber] = useState(initial.memberNumber ?? "");
   const [gender, setGender] = useState<Gender | "">(initial.gender ?? "");
   const [phone, setPhone] = useState(() => withDialCode(initial.phone ?? "", orgDialCode));
   const [email, setEmail] = useState(initial.email ?? "");
@@ -154,6 +155,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
     setError(null);
     const patch = {
       fullName,
+      memberNumber: memberNumber.trim() || undefined,
       gender: gender || undefined,
       phone: phone || undefined,
       email: email || undefined,
@@ -325,6 +327,10 @@ export function MemberDialog({ member: initial, members, households, fellowships
               <div className="sm:col-span-2">
                 <label className="block text-sm mb-1">Full name</label>
                 <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Member number</label>
+                <input value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} placeholder="Auto-assigned if left blank" className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Phone</label>
