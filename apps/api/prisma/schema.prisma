@@ -1,10 +1,11 @@
 generator client {
   provider = "prisma-client-js"
-  // "native" covers local dev (Windows/Mac); the rhel-* targets cover the
-  // Webuzo production server (CloudLinux 8, RHEL-family) -- both OpenSSL
-  // variants are listed since the exact version on that box can't be
-  // checked without shell access, and including both is harmless.
-  binaryTargets = ["native", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x"]
+  // "native" alone is enough now that `prisma generate` runs directly on
+  // the Webuzo server via SSH -- confirmed it needs rhel-openssl-1.0.x
+  // specifically (older than either guess this used to list), so shipping
+  // extra wrong-target engines was just wasted space against a tight 1GiB
+  // disk quota.
+  binaryTargets = ["native"]
 }
 
 datasource db {
