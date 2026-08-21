@@ -160,6 +160,26 @@ export function SettingsPage() {
         Your church's identity and profile. Visible to everyone in {org.displayName}.
       </p>
 
+      <section
+        className="rounded-xl border p-5 mb-6 flex items-center justify-between gap-4"
+        style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+      >
+        <div>
+          <h2 className="text-sm font-medium mb-1">User guide</h2>
+          <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+            A walkthrough of every role and workflow in Synaxis, with screenshots.
+          </p>
+        </div>
+        <a
+          href="/user_guide.pdf"
+          download
+          className="rounded-md px-4 py-2 text-sm font-medium shrink-0"
+          style={{ background: "var(--accent)", color: "white" }}
+        >
+          Download PDF
+        </a>
+      </section>
+
       <section className="rounded-xl border p-5 mb-6" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
         <h2 className="text-sm font-medium mb-4">Theme</h2>
         <div className="flex flex-wrap gap-3">
