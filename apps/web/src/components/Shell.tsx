@@ -206,6 +206,33 @@ function HamburgerIcon() {
   );
 }
 
+function HomeIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M9 22V12h6v10" />
+    </svg>
+  );
+}
+
+function CollapseToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: collapsed ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}
+    >
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
@@ -224,10 +251,39 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-function NavGroup({ label, icon: Icon, items }: { label: string; icon: IconComponent; items: NavItem[] }) {
+function NavGroup({
+  label,
+  icon: Icon,
+  items,
+  collapsed,
+  onExpandSidebar,
+}: {
+  label: string;
+  icon: IconComponent;
+  items: NavItem[];
+  collapsed: boolean;
+  onExpandSidebar: () => void;
+}) {
   const activeNavPath = useActiveNavPath();
   const hasActiveItem = items.some((item) => item.to === activeNavPath);
   const [open, setOpen] = useState(hasActiveItem);
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true);
+          onExpandSidebar();
+        }}
+        title={label}
+        className="w-full flex items-center justify-center px-2 py-2 rounded-md"
+        style={{ color: "var(--sidebar-ink-muted)" }}
+      >
+        <Icon />
+      </button>
+    );
+  }
 
   return (
     <div>
@@ -278,18 +334,30 @@ function NavGroup({ label, icon: Icon, items }: { label: string; icon: IconCompo
 /** Same visual weight as a NavGroup header (uppercase, tracking-wide) but a
  * direct link with no children -- Dashboard reads as one of the list, not a
  * distinct admin action. */
-function TopNavLink({ to, label }: { to: string; label: string }) {
+function TopNavLink({
+  to,
+  label,
+  icon: Icon,
+  collapsed,
+}: {
+  to: string;
+  label: string;
+  icon: IconComponent;
+  collapsed: boolean;
+}) {
   const active = useActiveNavPath() === to;
   return (
     <Link
       to={to}
-      className="w-full flex items-center px-2 py-1 rounded-md text-xs uppercase tracking-wide"
+      title={collapsed ? label : undefined}
+      className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-1.5"} px-2 py-1.5 rounded-md text-xs uppercase tracking-wide`}
       style={{
         color: active ? "var(--sidebar-ink)" : "var(--sidebar-ink-muted)",
         background: active ? "var(--sidebar-active-bg)" : "transparent",
       }}
     >
-      {label}
+      <Icon />
+      {!collapsed && <span>{label}</span>}
     </Link>
   );
 }
@@ -300,11 +368,37 @@ export function Shell({ children }: { children: ReactNode }) {
   const terms = useTerminology();
   const navGroups = buildNavGroups(terms);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (!user) return false;
+    return localStorage.getItem(`sidebar-collapsed:${user.id}`) === "true";
+  });
+  // The collapse toggle is desktop-only -- on a narrow viewport the mobile
+  // drawer (translate-x based, always full width) is what's actually shown,
+  // so the icon-only rendering below must never kick in there even if
+  // `collapsed` is true from an earlier desktop session.
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia("(min-width: 768px)").matches);
   const location = useLocation();
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setIsDesktop(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  const effectiveCollapsed = collapsed && isDesktop;
 
   // Close the drawer on every navigation, not just a backdrop click --
   // otherwise picking a link leaves it open behind the new page.
   useEffect(() => setMobileNavOpen(false), [location.pathname]);
+
+  function setCollapsedPersisted(next: boolean) {
+    setCollapsed(next);
+    if (user) localStorage.setItem(`sidebar-collapsed:${user.id}`, String(next));
+  }
+  function toggleCollapsed() {
+    setCollapsedPersisted(!collapsed);
+  }
 
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: "var(--bg)", color: "var(--ink)" }}>
@@ -316,7 +410,7 @@ export function Shell({ children }: { children: ReactNode }) {
         />
       )}
       <aside
-        className={`w-64 shrink-0 p-4 flex flex-col gap-1 fixed md:static inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-out md:translate-x-0 ${
+        className={`w-64 ${collapsed ? "md:w-16" : ""} shrink-0 p-4 flex flex-col gap-1 fixed md:static inset-y-0 left-0 z-40 transform transition-all duration-200 ease-out md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{
@@ -325,15 +419,37 @@ export function Shell({ children }: { children: ReactNode }) {
           // overlay rather than a fixed color, so it reads consistently
           // over whichever --sidebar-bg the active theme sets.
           backgroundImage: "linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 15%, rgba(0,0,0,0.90) 100%)",
+          position: "relative",
         }}
       >
-        <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden md:flex items-center justify-center rounded-full"
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: -11,
+            transform: "translateY(-50%)",
+            width: 22,
+            height: 22,
+            background: "var(--sidebar-bg)",
+            border: "1px solid var(--sidebar-ink-muted)",
+            color: "var(--sidebar-ink-muted)",
+            zIndex: 50,
+          }}
+        >
+          <CollapseToggleIcon collapsed={collapsed} />
+        </button>
+
+        <div className={`mb-4 flex items-center gap-2 ${collapsed ? "md:justify-center" : ""}`}>
           {org?.logoUrl ? (
             <img src={org.logoUrl} alt={org.displayName} className="h-8 w-8 rounded object-contain shrink-0" />
           ) : (
             <Logo className="h-8 w-auto shrink-0" surface="sidebar" />
           )}
-          <div>
+          <div className={collapsed ? "md:hidden" : ""}>
             <div className="font-semibold leading-tight" style={{ color: "var(--sidebar-ink)" }}>
               {org?.displayName ?? "Synaxis MMP"}
             </div>
@@ -346,10 +462,11 @@ export function Shell({ children }: { children: ReactNode }) {
         {user?.role === Role.PLATFORM_ADMIN && (
           <Link
             to="/platform"
-            className="rounded-md px-2 py-1.5 text-sm font-medium mb-2"
+            title={effectiveCollapsed ? "Platform Admin" : undefined}
+            className={`rounded-md px-2 py-1.5 text-sm font-medium mb-2 ${collapsed ? "md:text-center" : ""}`}
             style={{ background: "var(--sidebar-active-bg)", color: "var(--sidebar-ink)" }}
           >
-            Platform Admin
+            {effectiveCollapsed ? "PA" : "Platform Admin"}
           </Link>
         )}
 
@@ -358,12 +475,25 @@ export function Shell({ children }: { children: ReactNode }) {
             is their only destination here. */}
         {user?.role !== Role.PLATFORM_ADMIN && (
           <nav className="mt-1 flex flex-col gap-1 overflow-y-auto flex-1 sidebar-nav">
-            <TopNavLink to="/" label="Dashboard" />
+            <TopNavLink to="/" label="Dashboard" icon={HomeIcon} collapsed={effectiveCollapsed} />
             {navGroups.map((group) => (
-              <NavGroup key={group.label} label={group.label} icon={group.icon} items={group.items} />
+              <NavGroup
+                key={group.label}
+                label={group.label}
+                icon={group.icon}
+                items={group.items}
+                collapsed={effectiveCollapsed}
+                onExpandSidebar={() => setCollapsedPersisted(false)}
+              />
             ))}
             {user?.role === Role.ORG_ADMIN && (
-              <NavGroup label={SETUP_GROUP.label} icon={SETUP_GROUP.icon} items={SETUP_GROUP.items} />
+              <NavGroup
+                label={SETUP_GROUP.label}
+                icon={SETUP_GROUP.icon}
+                items={SETUP_GROUP.items}
+                collapsed={effectiveCollapsed}
+                onExpandSidebar={() => setCollapsedPersisted(false)}
+              />
             )}
           </nav>
         )}
