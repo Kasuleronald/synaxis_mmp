@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   COUNTRIES,
   Gender,
@@ -88,6 +88,8 @@ export function MembersPage() {
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
   const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+  const columnsMenuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(() => {
     if (!user) return DEFAULT_VISIBLE_COLUMNS;
     try {
@@ -182,6 +184,17 @@ export function MembersPage() {
     api.get<FellowshipDto[]>("/fellowships").then(setFellowships).catch(() => {});
     api.get<DiscipleshipClassDto[]>("/discipleship/classes").then(setDiscipleshipClasses).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!showColumnsMenu && !showExportMenu) return;
+    function onClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(target)) setShowColumnsMenu(false);
+      if (exportMenuRef.current && !exportMenuRef.current.contains(target)) setShowExportMenu(false);
+    }
+    document.addEventListener("mousedown", onClickOutside, true);
+    return () => document.removeEventListener("mousedown", onClickOutside, true);
+  }, [showColumnsMenu, showExportMenu]);
 
   function resetForm() {
     setFullName("");
@@ -362,7 +375,7 @@ export function MembersPage() {
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-xl font-semibold">{terms.member}</h1>
         <div className="flex items-center gap-2">
-          <div className="relative">
+          <div className="relative" ref={columnsMenuRef}>
             <button
               type="button"
               onClick={() => setShowColumnsMenu((s) => !s)}
@@ -399,7 +412,7 @@ export function MembersPage() {
           >
             Registrations
           </Link>
-          <div className="relative">
+          <div className="relative" ref={exportMenuRef}>
             <button
               type="button"
               onClick={() => setShowExportMenu((s) => !s)}
