@@ -7,6 +7,7 @@ import { CreateFixedAssetDto } from "./dto/create-fixed-asset.dto";
 import { CreateConditionRequestDto } from "./dto/create-condition-request.dto";
 import { RespondConditionRequestDto } from "./dto/respond-condition-request.dto";
 import { CreateFixedAssetEditRequestDto } from "./dto/create-fixed-asset-edit-request.dto";
+import { AddFixedAssetPhotoDto } from "./dto/add-fixed-asset-photo.dto";
 import { FixedAssetsService } from "./fixed-assets.service";
 
 @Controller("fixed-assets")
@@ -32,6 +33,16 @@ export class FixedAssetsController {
   @Delete(":id")
   remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.fixedAssets.remove(tenantContextFor(user), id);
+  }
+
+  @Post(":id/photos")
+  addPhoto(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: AddFixedAssetPhotoDto) {
+    return this.fixedAssets.addPhoto(tenantContextFor(user), id, dto);
+  }
+
+  @Delete(":id/photos/:photoId")
+  removePhoto(@CurrentUser() user: SessionUser, @Param("id") id: string, @Param("photoId") photoId: string) {
+    return this.fixedAssets.removePhoto(tenantContextFor(user), id, photoId);
   }
 
   @Get("condition-requests/all")

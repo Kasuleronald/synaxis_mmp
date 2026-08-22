@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -7,11 +7,18 @@ import { UpdateFixedAssetDto } from "./dto/update-fixed-asset.dto";
 import { CreateConditionRequestDto } from "./dto/create-condition-request.dto";
 import { RespondConditionRequestDto } from "./dto/respond-condition-request.dto";
 import { CreateFixedAssetEditRequestDto } from "./dto/create-fixed-asset-edit-request.dto";
+import { AddFixedAssetPhotoDto } from "./dto/add-fixed-asset-photo.dto";
 
 const REQUEST_INCLUDE = {
   requestedBy: { select: { id: true, fullName: true } },
   respondedBy: { select: { id: true, fullName: true } },
   photos: { include: { asset: { select: { id: true, name: true, mimeType: true } } } },
+} as const;
+
+const MAX_PHOTOS_PER_ASSET = 4;
+
+const PHOTOS_INCLUDE = {
+  photos: { include: { asset: { select: { id: true, name: true, mimeType: true } } }, orderBy: { createdAt: "asc" } },
 } as const;
 
 const EDIT_REQUEST_INCLUDE = {
@@ -81,6 +88,7 @@ export class FixedAssetsService {
         include: {
           branch: { select: { id: true, name: true } },
           _count: { select: { conditionRequests: true } },
+          ...PHOTOS_INCLUDE,
         },
       }),
     );
@@ -97,6 +105,7 @@ export class FixedAssetsService {
         include: {
           branch: { select: { id: true, name: true } },
           conditionRequests: { orderBy: { createdAt: "desc" }, include: REQUEST_INCLUDE },
+          ...PHOTOS_INCLUDE,
         },
       }),
     );
@@ -106,6 +115,39 @@ export class FixedAssetsService {
 
   async remove(ctx: TenantContext, id: string) {
     await runWithTenant(this.prisma, ctx, (tx) => tx.fixedAsset.delete({ where: { id } }));
+  }
+
+  /** Reference photos of the asset, capped at MAX_PHOTOS_PER_ASSET -- once
+   * full, the caller has to delete one first (removePhoto) rather than the
+   * oldest silently rotating out, so nothing disappears without the person
+   * choosing it. */
+  async addPhoto(ctx: TenantContext, fixedAssetId: string, dto: AddFixedAssetPhotoDto) {
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const asset = await tx.fixedAsset.findUnique({ where: { id: fixedAssetId } });
+      if (!asset) throw new NotFoundException("Asset not found");
+
+      const count = await tx.fixedAssetPhoto.count({ where: { fixedAssetId } });
+      if (count >= MAX_PHOTOS_PER_ASSET) {
+        throw new BadRequestException(
+          `This asset already has ${MAX_PHOTOS_PER_ASSET} photos -- delete one before adding another.`,
+        );
+      }
+
+      return tx.fixedAssetPhoto.create({
+        data: { fixedAssetId, assetId: dto.assetId },
+        include: { asset: { select: { id: true, name: true, mimeType: true } } },
+      });
+    });
+  }
+
+  async removePhoto(ctx: TenantContext, fixedAssetId: string, photoId: string) {
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const photo = await tx.fixedAssetPhoto.findUnique({ where: { id: photoId } });
+      if (!photo || photo.fixedAssetId !== fixedAssetId) throw new NotFoundException("Photo not found");
+      // Cascades to the join row; the underlying Asset blob is deleted too
+      // so a removed photo doesn't just linger as orphaned storage.
+      await tx.asset.delete({ where: { id: photo.assetId } });
+    });
   }
 
   /** The review inbox -- every condition request across every asset, newest

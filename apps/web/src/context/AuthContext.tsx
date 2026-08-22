@@ -1,7 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import type { SessionUser } from "@life-mmp/shared";
+import { Role, type SessionUser } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { cacheSession, getCachedSession } from "../lib/db";
+
+const PLATFORM_ADMIN_IDLE_MS = 5 * 60 * 1000;
+const OTHER_ROLES_IDLE_MS = 10 * 60 * 1000;
+const ACTIVITY_EVENTS = ["mousedown", "keydown", "wheel", "touchstart"] as const;
 
 interface AuthState {
   user: SessionUser | null;
@@ -51,6 +55,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     await cacheSession(null);
   }, []);
+
+  // Auto-logout after a period of no interaction -- Platform Admin gets a
+  // shorter window since that account can create/suspend any church's
+  // tenant, a higher-stakes thing to leave signed in unattended.
+  useEffect(() => {
+    if (!user) return;
+    const idleMs = user.role === Role.PLATFORM_ADMIN ? PLATFORM_ADMIN_IDLE_MS : OTHER_ROLES_IDLE_MS;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function resetTimer() {
+      clearTimeout(timer);
+      timer = setTimeout(logout, idleMs);
+    }
+
+    resetTimer();
+    ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, resetTimer));
+    return () => {
+      clearTimeout(timer);
+      ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [user, logout]);
 
   /** For self-service changes that don't go through login (e.g. uploading a
    * profile photo) -- re-pulls the session so the header updates immediately

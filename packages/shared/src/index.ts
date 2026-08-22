@@ -1216,6 +1216,7 @@ export interface FixedAssetDto {
   createdById: string | null;
   createdAt: string;
   _count?: { conditionRequests: number };
+  photos: { id: string; asset: { id: string; name: string; mimeType: string } }[];
 }
 
 export interface CreateFixedAssetInput {

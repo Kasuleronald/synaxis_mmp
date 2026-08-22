@@ -9,9 +9,9 @@ export class SubmitRegistrationDto {
   @MinLength(1)
   fullName!: string;
 
-  @IsOptional()
   @IsString()
-  phone?: string;
+  @MinLength(1)
+  phone!: string;
 
   @IsOptional()
   @IsEmail()
@@ -54,9 +54,9 @@ export class SubmitRegistrationDto {
   @IsString()
   school?: string;
 
-  @IsOptional()
   @IsString()
-  address?: string;
+  @MinLength(1)
+  address!: string;
 
   @IsOptional()
   @IsString()

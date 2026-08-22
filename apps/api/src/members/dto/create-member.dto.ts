@@ -88,17 +88,17 @@ export class CreateMemberDto {
   @IsString()
   school?: string;
 
-  @IsOptional()
   @IsString()
-  phone?: string;
+  @MinLength(1)
+  phone!: string;
 
   @IsOptional()
   @IsEmail()
   email?: string;
 
-  @IsOptional()
   @IsString()
-  address?: string;
+  @MinLength(1)
+  address!: string;
 
   @IsOptional()
   @IsEnum(MemberStatus)

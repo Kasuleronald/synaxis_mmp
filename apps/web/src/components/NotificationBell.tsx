@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NotificationDto } from "@life-mmp/shared";
 import { api } from "../lib/api";
@@ -17,6 +17,23 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [unread, setUnread] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    // Capture phase, not bubble -- a notification item's own onClick already
+    // closes the dropdown and may unmount/navigate away before a bubble-phase
+    // document listener would fire, which is fine either way here, but
+    // capture also means an outside click can't be intercepted by something
+    // else calling stopPropagation() first.
+    document.addEventListener("mousedown", onClickOutside, true);
+    return () => document.removeEventListener("mousedown", onClickOutside, true);
+  }, [open]);
 
   async function refreshCount() {
     try {
@@ -61,7 +78,7 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         onClick={toggle}

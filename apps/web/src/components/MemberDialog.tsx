@@ -151,6 +151,13 @@ export function MemberDialog({ member: initial, members, households, fellowships
   }, [onClose]);
 
   async function onSave() {
+    // This dialog's Save is a plain button, not a form submit -- the
+    // `required` attributes on the inputs above don't get enforced by the
+    // browser on their own, so the check has to happen here instead.
+    if (!fullName.trim() || !phone.trim() || !address.trim()) {
+      setError("Full name, phone, and address are required.");
+      return;
+    }
     setSaving(true);
     setError(null);
     const patch = {
@@ -334,7 +341,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
               </div>
               <div>
                 <label className="block text-sm mb-1">Phone</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
+                <input required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Email</label>
@@ -342,7 +349,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm mb-1">Address</label>
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Where they stay -- village, area, or street" className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
+                <input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Where they stay -- village, area, or street" className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Gender</label>

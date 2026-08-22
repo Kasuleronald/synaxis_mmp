@@ -252,6 +252,12 @@ export function FixedAssetsPage() {
   const [responding, setResponding] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_ASSET_PHOTOS = 4;
+  const [managingPhotosId, setManagingPhotosId] = useState<string | null>(null);
+  const [uploadingAssetPhoto, setUploadingAssetPhoto] = useState(false);
+  const [assetPhotoError, setAssetPhotoError] = useState<string | null>(null);
+  const assetPhotoInputRef = useRef<HTMLInputElement>(null);
+
   async function load() {
     const [a, b, r, e] = await Promise.all([
       api.get<FixedAssetDto[]>("/fixed-assets"),
@@ -361,6 +367,35 @@ export function FixedAssetsPage() {
     setResponseCondition(AssetCondition.GOOD);
     setResponseDescription("");
     setResponsePhotos([]);
+  }
+
+  async function onUploadAssetPhoto(assetId: string, files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setAssetPhotoError(null);
+    setUploadingAssetPhoto(true);
+    try {
+      for (const file of Array.from(files)) {
+        const optimized = await optimizeImage(file);
+        const uploaded = await api.upload<{ id: string }>("/assets", optimized);
+        await api.post(`/fixed-assets/${assetId}/photos`, { assetId: uploaded.id });
+      }
+      await load();
+    } catch (err) {
+      setAssetPhotoError(err instanceof ApiError ? err.message : "Photo upload failed.");
+    } finally {
+      setUploadingAssetPhoto(false);
+      if (assetPhotoInputRef.current) assetPhotoInputRef.current.value = "";
+    }
+  }
+
+  async function onDeleteAssetPhoto(assetId: string, photoId: string) {
+    setAssetPhotoError(null);
+    try {
+      await api.delete(`/fixed-assets/${assetId}/photos/${photoId}`);
+      await load();
+    } catch (err) {
+      setAssetPhotoError(err instanceof ApiError ? err.message : "Couldn't delete that photo.");
+    }
   }
 
   async function onUploadPhoto(files: FileList | null) {
@@ -475,6 +510,7 @@ export function FixedAssetsPage() {
                 <th className="text-left font-medium px-4 py-2">Cost</th>
                 <th className="text-left font-medium px-4 py-2">Current value</th>
                 <th className="text-left font-medium px-4 py-2">Condition</th>
+                <th className="text-left font-medium px-4 py-2">Photos</th>
                 <th className="text-right font-medium px-4 py-2">Actions</th>
               </tr>
             </thead>
@@ -494,6 +530,30 @@ export function FixedAssetsPage() {
                       <span className="text-xs font-medium" style={{ color: CONDITION_COLORS[a.currentCondition] }}>
                         {ASSET_CONDITION_LABELS[a.currentCondition]}
                       </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManagingPhotosId(managingPhotosId === a.id ? null : a.id);
+                          setAssetPhotoError(null);
+                        }}
+                        className="flex items-center gap-1"
+                        title="Manage photos"
+                      >
+                        {a.photos.slice(0, 4).map((p) => (
+                          <img
+                            key={p.id}
+                            src={`/api/assets/${p.asset.id}/file`}
+                            alt=""
+                            className="rounded object-cover"
+                            style={{ width: 24, height: 24, border: "1px solid var(--line)" }}
+                          />
+                        ))}
+                        {a.photos.length === 0 && (
+                          <span className="text-xs" style={{ color: "var(--ink-muted)" }}>Add</span>
+                        )}
+                      </button>
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center gap-1 justify-end">
@@ -525,9 +585,63 @@ export function FixedAssetsPage() {
                       </div>
                     </td>
                   </tr>
+                  {managingPhotosId === a.id && (
+                    <tr style={{ borderColor: "var(--line-soft)" }}>
+                      <td colSpan={8} className="px-4 py-3" style={{ background: "var(--surface-2)" }}>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {a.photos.map((p) => (
+                            <div key={p.id} className="relative">
+                              <img
+                                src={`/api/assets/${p.asset.id}/file`}
+                                alt=""
+                                className="rounded object-cover"
+                                style={{ width: 72, height: 72, border: "1px solid var(--line)" }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => onDeleteAssetPhoto(a.id, p.id)}
+                                title="Delete this photo"
+                                className="absolute -top-1.5 -right-1.5 rounded-full flex items-center justify-center text-xs font-semibold"
+                                style={{ width: 18, height: 18, background: "var(--danger)", color: "white" }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          {a.photos.length < MAX_ASSET_PHOTOS ? (
+                            <button
+                              type="button"
+                              disabled={uploadingAssetPhoto}
+                              onClick={() => assetPhotoInputRef.current?.click()}
+                              className="rounded-md border-2 border-dashed flex items-center justify-center text-xs disabled:opacity-60"
+                              style={{ width: 72, height: 72, borderColor: "var(--line)", color: "var(--ink-muted)" }}
+                            >
+                              {uploadingAssetPhoto ? "Uploading…" : "+ Add"}
+                            </button>
+                          ) : (
+                            <p className="text-xs max-w-[10rem]" style={{ color: "var(--ink-muted)" }}>
+                              Up to {MAX_ASSET_PHOTOS} photos -- delete one above to add another.
+                            </p>
+                          )}
+                        </div>
+                        <input
+                          ref={assetPhotoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => onUploadAssetPhoto(a.id, e.target.files)}
+                        />
+                        {assetPhotoError && (
+                          <div className="mt-2 text-xs" style={{ color: "var(--danger)" }}>
+                            {assetPhotoError}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
                   {editingAssetId === a.id && (
                     <tr style={{ borderColor: "var(--line-soft)" }}>
-                      <td colSpan={7} className="px-4 py-3" style={{ background: "var(--surface-2)" }}>
+                      <td colSpan={8} className="px-4 py-3" style={{ background: "var(--surface-2)" }}>
                         <form
                           onSubmit={(e: FormEvent) => {
                             e.preventDefault();

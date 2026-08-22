@@ -1043,6 +1043,7 @@ model Asset {
   conditionPhotos AssetConditionPhoto[]
   avatarOfUsers   User[] @relation("UserAvatar")
   requisitionReceipts RequisitionReceipt[]
+  fixedAssetPhotos    FixedAssetPhoto[]
 
   @@index([organizationId])
   @@map("assets")
@@ -1098,10 +1099,27 @@ model FixedAsset {
 
   conditionRequests AssetConditionRequest[]
   editRequests      FixedAssetEditRequest[]
+  photos            FixedAssetPhoto[]
 
   @@index([organizationId])
   @@index([branchId])
   @@map("fixed_assets")
+}
+
+/// Reference photos of the asset itself -- capped at 4 (enforced in the
+/// service, not the schema); distinct from AssetConditionPhoto, which
+/// documents a specific condition check response, not "what this looks
+/// like" in general.
+model FixedAssetPhoto {
+  id           String   @id @default(uuid())
+  fixedAssetId String
+  fixedAsset   FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([fixedAssetId])
+  @@map("fixed_asset_photos")
 }
 
 /// Maker-checker for editing the register itself (Section 6's approval

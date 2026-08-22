@@ -143,6 +143,7 @@ export function RegisterPage() {
         <div>
           <label className="block text-sm mb-1">Phone</label>
           <input
+            required
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder={phoneExample}
@@ -195,6 +196,7 @@ export function RegisterPage() {
         <div className="sm:col-span-2">
           <label className="block text-sm mb-1">Address</label>
           <input
+            required
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Where you stay -- village, area, or street"

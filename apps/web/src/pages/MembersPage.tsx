@@ -482,6 +482,7 @@ export function MembersPage() {
           <div>
             <label className="block text-sm mb-1">Phone</label>
             <input
+              required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full rounded-md border px-3 py-2 text-sm"
@@ -533,6 +534,7 @@ export function MembersPage() {
           <div className="sm:col-span-2">
             <label className="block text-sm mb-1">Address</label>
             <input
+              required
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Where they stay -- village, area, or street"
