@@ -410,7 +410,7 @@ export function Shell({ children }: { children: ReactNode }) {
         />
       )}
       <aside
-        className={`w-64 ${collapsed ? "md:w-16" : ""} shrink-0 p-4 flex flex-col gap-1 fixed md:static inset-y-0 left-0 z-40 transform transition-all duration-200 ease-out md:translate-x-0 ${
+        className={`w-64 ${collapsed ? "md:w-16" : ""} shrink-0 p-4 flex flex-col gap-1 fixed md:relative inset-y-0 left-0 z-40 transform transition-all duration-200 ease-out md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{
@@ -419,7 +419,6 @@ export function Shell({ children }: { children: ReactNode }) {
           // overlay rather than a fixed color, so it reads consistently
           // over whichever --sidebar-bg the active theme sets.
           backgroundImage: "linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 15%, rgba(0,0,0,0.90) 100%)",
-          position: "relative",
         }}
       >
         <button
