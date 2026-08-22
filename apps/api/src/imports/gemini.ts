@@ -8,11 +8,15 @@
 
 export interface GeminiExtractedRow {
   fullName?: string;
+  memberNumber?: string;
   phone?: string;
   email?: string;
   gender?: "MALE" | "FEMALE";
   dateOfBirth?: string;
   address?: string;
+  nationality?: string;
+  maritalStatus?: "SINGLE" | "MARRIED" | "DIVORCED" | "WIDOWED";
+  status?: "VISITOR" | "NEW_CONVERT" | "MEMBER" | "INACTIVE";
   confidence?: number;
 }
 
@@ -25,11 +29,15 @@ const RESPONSE_SCHEMA = {
         type: "object",
         properties: {
           fullName: { type: "string" },
+          memberNumber: { type: "string", description: "An existing member/registration number, only if the document already assigns one" },
           phone: { type: "string" },
           email: { type: "string" },
           gender: { type: "string", enum: ["MALE", "FEMALE"] },
           dateOfBirth: { type: "string", description: "ISO 8601 date, YYYY-MM-DD, if determinable" },
           address: { type: "string" },
+          nationality: { type: "string" },
+          maritalStatus: { type: "string", enum: ["SINGLE", "MARRIED", "DIVORCED", "WIDOWED"] },
+          status: { type: "string", enum: ["VISITOR", "NEW_CONVERT", "MEMBER", "INACTIVE"], description: "Default to MEMBER if the document doesn't distinguish visitors from members" },
           confidence: { type: "number", description: "0 to 1, your confidence this row was read correctly" },
         },
         required: ["fullName"],

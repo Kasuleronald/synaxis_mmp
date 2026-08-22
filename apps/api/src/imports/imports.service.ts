@@ -28,6 +28,38 @@ function normalizeGender(raw: string | undefined): "MALE" | "FEMALE" | undefined
   return GENDER_WORDS[raw.trim().toLowerCase()];
 }
 
+const MARITAL_STATUS_WORDS: Record<string, "SINGLE" | "MARRIED" | "DIVORCED" | "WIDOWED"> = {
+  single: "SINGLE",
+  married: "MARRIED",
+  marriage: "MARRIED",
+  divorced: "DIVORCED",
+  divorcee: "DIVORCED",
+  widowed: "WIDOWED",
+  widow: "WIDOWED",
+  widower: "WIDOWED",
+};
+
+function normalizeMaritalStatus(raw: string | undefined): "SINGLE" | "MARRIED" | "DIVORCED" | "WIDOWED" | undefined {
+  if (!raw) return undefined;
+  return MARITAL_STATUS_WORDS[raw.trim().toLowerCase()];
+}
+
+const MEMBER_STATUS_WORDS: Record<string, "VISITOR" | "NEW_CONVERT" | "MEMBER" | "INACTIVE"> = {
+  visitor: "VISITOR",
+  guest: "VISITOR",
+  "new convert": "NEW_CONVERT",
+  convert: "NEW_CONVERT",
+  newconvert: "NEW_CONVERT",
+  member: "MEMBER",
+  active: "MEMBER",
+  inactive: "INACTIVE",
+};
+
+function normalizeMemberStatus(raw: string | undefined): "VISITOR" | "NEW_CONVERT" | "MEMBER" | "INACTIVE" | undefined {
+  if (!raw) return undefined;
+  return MEMBER_STATUS_WORDS[raw.trim().toLowerCase()];
+}
+
 function normalizeName(raw: string): string {
   return raw.toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -79,7 +111,14 @@ export class ImportsService {
           for (const { field, header, confidence } of mapping) {
             const value = row[header]?.toString().trim();
             if (!value) continue;
-            extractedFields[field] = field === "gender" ? (normalizeGender(value) ?? value) : value;
+            extractedFields[field] =
+              field === "gender"
+                ? (normalizeGender(value) ?? value)
+                : field === "maritalStatus"
+                  ? (normalizeMaritalStatus(value) ?? value)
+                  : field === "status"
+                    ? (normalizeMemberStatus(value) ?? value)
+                    : value;
             minConfidence = Math.min(minConfidence, confidence);
           }
           return { extractedFields, confidence: minConfidence, source: "deterministic" as const };
@@ -115,6 +154,20 @@ export class ImportsService {
       const existing = await tx.member.findMany({ select: { id: true, fullName: true } });
       const existingByName = new Map(existing.map((m) => [normalizeName(m.fullName), m.id]));
 
+      // Most imported congregations share the church's own home country --
+      // a row that didn't specify nationality gets that as a starting
+      // point, still visible and changeable in review before anything
+      // commits, rather than left blank by default.
+      const org = await tx.organization.findUnique({
+        where: { id: ctx.organizationId as string },
+        select: { country: true },
+      });
+      if (org?.country) {
+        for (const c of candidates) {
+          if (!c.extractedFields.nationality) c.extractedFields.nationality = org.country;
+        }
+      }
+
       await tx.importStagingRow.createMany({
         data: candidates.map((c, i) => ({
           organizationId: ctx.organizationId as string,
@@ -137,11 +190,15 @@ export class ImportsService {
       return rows.map((r: GeminiExtractedRow) => ({
         extractedFields: {
           fullName: r.fullName,
+          memberNumber: r.memberNumber,
           phone: r.phone,
           email: r.email,
           gender: r.gender,
           dateOfBirth: r.dateOfBirth,
           address: r.address,
+          nationality: r.nationality,
+          maritalStatus: r.maritalStatus,
+          status: r.status,
         },
         confidence: r.confidence ?? 0.5,
         source: "ai" as const,
@@ -194,18 +251,44 @@ export class ImportsService {
       if (!batch) throw new NotFoundException("Import batch not found");
 
       const approved = batch.rows.filter((r) => r.status === ImportRowStatus.APPROVED);
+      // Tracks numbers claimed earlier in this same batch, not just ones
+      // already in the DB -- two rows in one import could otherwise both
+      // claim the same number and only the DB constraint would catch it,
+      // aborting the whole commit (every row is one transaction).
+      const usedMemberNumbers = new Set<string>();
       for (const row of approved) {
         const f = row.extractedFields as Record<string, string | undefined>;
+
+        let memberNumber = f.memberNumber?.trim() || undefined;
+        if (memberNumber) {
+          const conflict =
+            usedMemberNumbers.has(memberNumber) ||
+            (await tx.member.findUnique({
+              where: { organizationId_memberNumber: { organizationId: ctx.organizationId as string, memberNumber } },
+              select: { id: true },
+            }));
+          // Already taken -- import the person anyway, just without that
+          // number, rather than failing the entire batch over one row.
+          if (conflict) memberNumber = undefined;
+        }
+        if (memberNumber) usedMemberNumbers.add(memberNumber);
+
         await tx.member.create({
           data: {
             organizationId: ctx.organizationId as string,
             fullName: f.fullName as string,
+            memberNumber,
             phone: f.phone || undefined,
             email: f.email || undefined,
             gender: (normalizeGender(f.gender) ?? undefined) as any,
             ...parseBirthday(f.dateOfBirth),
             address: f.address || undefined,
-            status: "VISITOR",
+            nationality: f.nationality || undefined,
+            maritalStatus: (normalizeMaritalStatus(f.maritalStatus) ?? undefined) as any,
+            // A row usually represents someone already on the church's own
+            // roll, not a first-time visitor -- MEMBER is the more useful
+            // default here than the Add Member form's own VISITOR default.
+            status: (normalizeMemberStatus(f.status) ?? "MEMBER") as any,
           },
         });
         await tx.importStagingRow.update({ where: { id: row.id }, data: { status: ImportRowStatus.COMMITTED } });

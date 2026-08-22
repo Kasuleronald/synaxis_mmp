@@ -14,8 +14,8 @@ const STATUS_LABELS: Record<ImportStatus, string> = {
 function downloadStarterTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
-    ["Full Name", "Phone", "Gender", "Date of Birth", "Address"],
-    ["Jane Doe", "+256700000000", "Female", "1990-05-14", "Kampala"],
+    ["Full Name", "Member Number", "Phone", "Email", "Gender", "Date of Birth", "Address", "Nationality", "Marital Status", "Status"],
+    ["Jane Doe", "", "+256700000000", "jane@example.com", "Female", "1990-05-14", "Kampala", "Uganda", "Single", "Member"],
   ]);
   XLSX.utils.book_append_sheet(wb, ws, "Members");
   XLSX.writeFile(wb, "life-mmp-member-import-template.xlsx");

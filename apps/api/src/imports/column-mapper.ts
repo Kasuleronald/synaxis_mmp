@@ -8,22 +8,28 @@
 
 export const MEMBER_TARGET_FIELDS = [
   "fullName",
+  "memberNumber",
   "phone",
   "email",
   "gender",
   "dateOfBirth",
   "address",
+  "nationality",
+  "maritalStatus",
   "status",
 ] as const;
 export type MemberTargetField = (typeof MEMBER_TARGET_FIELDS)[number];
 
 const SYNONYMS: Record<MemberTargetField, string[]> = {
   fullName: ["name", "full name", "member name", "fullname", "names", "full names", "member"],
+  memberNumber: ["member number", "member no", "member id", "membership number", "reg number", "registration number", "id number"],
   phone: ["phone", "telephone", "tel", "phone number", "mobile", "mobile number", "contact", "cell", "cell number"],
   email: ["email", "email address", "e mail", "mail"],
   gender: ["gender", "sex"],
   dateOfBirth: ["dob", "date of birth", "birthday", "birth date", "dateofbirth"],
   address: ["address", "location", "residence", "home address", "physical address"],
+  nationality: ["nationality", "citizenship", "country", "nation"],
+  maritalStatus: ["marital status", "marriage status", "married"],
   status: ["status", "membership status", "member status", "type", "member type"],
 };
 

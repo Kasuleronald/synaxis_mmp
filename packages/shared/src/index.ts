@@ -490,11 +490,15 @@ export interface ImportStagingRowDto {
   rowIndex: number;
   extractedFields: {
     fullName?: string;
+    memberNumber?: string;
     phone?: string;
     email?: string;
     gender?: Gender;
     dateOfBirth?: string;
     address?: string;
+    nationality?: string;
+    maritalStatus?: MaritalStatus;
+    status?: MemberStatus;
   };
   confidence: number | null;
   source: "deterministic" | "ai";
