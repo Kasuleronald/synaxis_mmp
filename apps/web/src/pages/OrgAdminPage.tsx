@@ -1,12 +1,22 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ORG_ASSIGNABLE_ROLES, Role, type BranchDto, type UserDto } from "@life-mmp/shared";
+import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
+import { EditIcon, IconButton } from "../components/icons";
 
 export function OrgAdminPage() {
   const [branches, setBranches] = useState<BranchDto[]>([]);
+  const [members, setMembers] = useState<MemberDto[]>([]);
   const [users, setUsers] = useState<UserDto[]>([]);
   const [branchName, setBranchName] = useState("");
   const [branchError, setBranchError] = useState<string | null>(null);
+
+  const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
+  const [editBranchName, setEditBranchName] = useState("");
+  const [editBranchLeaderId, setEditBranchLeaderId] = useState("");
+  const [branchSavingId, setBranchSavingId] = useState<string | null>(null);
+  const [branchEditError, setBranchEditError] = useState<string | null>(null);
+
+  const eligibleBranchLeaders = members.filter((m) => m.leadershipRoles.includes(LeadershipRole.BRANCH_LEADER));
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -17,8 +27,13 @@ export function OrgAdminPage() {
   const [userMessage, setUserMessage] = useState<string | null>(null);
 
   async function loadAll() {
-    const [b, u] = await Promise.all([api.get<BranchDto[]>("/branches"), api.get<UserDto[]>("/users")]);
+    const [b, m, u] = await Promise.all([
+      api.get<BranchDto[]>("/branches"),
+      api.get<MemberDto[]>("/members"),
+      api.get<UserDto[]>("/users"),
+    ]);
     setBranches(b);
+    setMembers(m);
     setUsers(u);
   }
 
@@ -35,6 +50,37 @@ export function OrgAdminPage() {
       await loadAll();
     } catch (err) {
       setBranchError(err instanceof ApiError ? err.message : "Something went wrong.");
+    }
+  }
+
+  function startEditBranch(b: BranchDto) {
+    setEditingBranchId(b.id);
+    setEditBranchName(b.name);
+    setEditBranchLeaderId(b.leaderId ?? "");
+    setBranchEditError(null);
+  }
+
+  async function saveBranchEdit(id: string) {
+    setBranchEditError(null);
+    try {
+      await api.patch(`/branches/${id}`, {
+        name: editBranchName,
+        leaderId: editBranchLeaderId || undefined,
+      });
+      setEditingBranchId(null);
+      await loadAll();
+    } catch (err) {
+      setBranchEditError(err instanceof ApiError ? err.message : "Something went wrong.");
+    }
+  }
+
+  async function makeMain(b: BranchDto) {
+    setBranchSavingId(b.id);
+    try {
+      await api.patch(`/branches/${b.id}`, { isMain: true });
+      await loadAll();
+    } finally {
+      setBranchSavingId(null);
     }
   }
 
@@ -123,15 +169,83 @@ export function OrgAdminPage() {
               No branches yet.
             </div>
           )}
-          {branches.map((b) => (
-            <div
-              key={b.id}
-              className="px-4 py-3 border-t first:border-t-0 text-sm"
-              style={{ borderColor: "var(--line-soft)" }}
-            >
-              {b.name} {b.isMain && <span style={{ color: "var(--ink-muted)" }}>· main</span>}
-            </div>
-          ))}
+          {branches.map((b) => {
+            const isEditing = editingBranchId === b.id;
+            return (
+              <div key={b.id} className="border-t first:border-t-0" style={{ borderColor: "var(--line-soft)" }}>
+                {isEditing ? (
+                  <div className="px-4 py-3 grid gap-2">
+                    <input
+                      value={editBranchName}
+                      onChange={(e) => setEditBranchName(e.target.value)}
+                      className="rounded-md border px-2 py-1 text-sm"
+                      style={{ borderColor: "var(--line)" }}
+                    />
+                    <select
+                      value={editBranchLeaderId}
+                      onChange={(e) => setEditBranchLeaderId(e.target.value)}
+                      className="rounded-md border px-2 py-1 text-sm"
+                      style={{ borderColor: "var(--line)" }}
+                    >
+                      <option value="">No leader assigned</option>
+                      {eligibleBranchLeaders.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    {eligibleBranchLeaders.length === 0 && (
+                      <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                        No members are tagged "Branch leader" yet -- add that leadership role from a
+                        member's profile first.
+                      </p>
+                    )}
+                    {branchEditError && (
+                      <div className="rounded-md px-2 py-1.5 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+                        {branchEditError}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => saveBranchEdit(b.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
+                        Save
+                      </button>
+                      <button type="button" onClick={() => setEditingBranchId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 flex items-center justify-between text-sm">
+                    <div>
+                      <span>{b.name}</span>{" "}
+                      {b.isMain && <span style={{ color: "var(--ink-muted)" }}>· main</span>}
+                      {b.leader && (
+                        <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                          Led by {b.leader.fullName}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!b.isMain && (
+                        <button
+                          type="button"
+                          disabled={branchSavingId === b.id}
+                          onClick={() => makeMain(b)}
+                          className="rounded-full px-2.5 py-1 text-xs font-medium disabled:opacity-60"
+                          style={{ background: "var(--surface-2)", color: "var(--ink-muted)" }}
+                        >
+                          Make main
+                        </button>
+                      )}
+                      <IconButton title="Edit" onClick={() => startEditBranch(b)}>
+                        <EditIcon />
+                      </IconButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 

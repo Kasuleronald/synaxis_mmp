@@ -162,6 +162,8 @@ export interface BranchDto {
   organizationId: string;
   name: string;
   isMain: boolean;
+  leaderId: string | null;
+  leader?: { id: string; fullName: string } | null;
   createdAt: string;
 }
 
