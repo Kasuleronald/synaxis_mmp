@@ -22,6 +22,7 @@ import {
 import { useOrg } from "../context/OrgContext";
 import { api } from "../lib/api";
 import { exportAttendanceToExcel, exportAttendanceToPdf } from "../lib/export";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
 
 function formatMoney(amount: number | string, currency: string) {
   return `${currency} ${Number(amount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -199,12 +200,9 @@ function StatementsTab({ currency }: { currency: string }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card title="Member giving statement">
-        <select value={memberId} onChange={(e) => setMemberId(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm mb-3" style={{ borderColor: "var(--line)" }}>
-          <option value="">Choose a member</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>{m.fullName}</option>
-          ))}
-        </select>
+        <div className="mb-3">
+          <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="Choose a member" />
+        </div>
         {memberStatement && (
           <div className="rounded-md border overflow-hidden" style={{ borderColor: "var(--line-soft)" }}>
             {memberStatement.lines.length === 0 ? (
@@ -339,19 +337,9 @@ function AttendanceListsTab() {
         </div>
       </Card>
       <Card title="Individual attendance">
-        <select
-          value={memberId}
-          onChange={(e) => setMemberId(e.target.value)}
-          className="w-full rounded-md border px-3 py-2 text-sm mb-3"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <option value="">Choose a member</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.fullName}
-            </option>
-          ))}
-        </select>
+        <div className="mb-3">
+          <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="Choose a member" />
+        </div>
         {memberAttendance && (
           <>
             <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>

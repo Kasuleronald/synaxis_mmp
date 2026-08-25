@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { HouseholdDto, MemberDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 import { useTerminology } from "../hooks/useTerminology";
 
@@ -120,19 +121,7 @@ export function HouseholdsPage() {
         </div>
         <div>
           <label className="block text-sm mb-1">Head of household</label>
-          <select
-            value={headMemberId}
-            onChange={(e) => onPickHead(e.target.value)}
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <option value="">None yet</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.fullName}
-              </option>
-            ))}
-          </select>
+          <MemberSearchSelect members={members} value={headMemberId} onChange={onPickHead} emptyLabel="None yet" />
         </div>
         <div>
           <label className="block text-sm mb-1">Address</label>
@@ -186,12 +175,7 @@ export function HouseholdsPage() {
               {isEditing ? (
                 <div className="px-4 py-3 grid gap-2">
                   <input value={editName} onChange={(e) => setEditName(e.target.value)} className="rounded-md border px-2 py-1 text-sm" style={{ borderColor: "var(--line)" }} />
-                  <select value={editHeadMemberId} onChange={(e) => setEditHeadMemberId(e.target.value)} className="rounded-md border px-2 py-1 text-sm" style={{ borderColor: "var(--line)" }}>
-                    <option value="">None</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.fullName}</option>
-                    ))}
-                  </select>
+                  <MemberSearchSelect members={members} value={editHeadMemberId} onChange={setEditHeadMemberId} emptyLabel="None" />
                   <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Address" className="rounded-md border px-2 py-1 text-sm" style={{ borderColor: "var(--line)" }} />
                   <div className="flex gap-2">
                     <button type="button" onClick={() => saveEdit(h.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>Save</button>

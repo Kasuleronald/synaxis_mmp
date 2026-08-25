@@ -11,6 +11,7 @@ import {
 import { api } from "../lib/api";
 import { useOrg } from "../context/OrgContext";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
 
 function formatMoney(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -125,21 +126,7 @@ export function PledgesPage() {
           {pledgerType === "member" ? (
             <div>
               <label className="block text-sm mb-1">Member</label>
-              <select
-                required
-                value={memberId}
-                onChange={(e) => setMemberId(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              >
-                {members.length === 0 && <option value="">No members yet</option>}
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.fullName}
-                    {m.memberNumber ? ` (${m.memberNumber})` : ""}
-                  </option>
-                ))}
-              </select>
+              <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="No members yet" />
             </div>
           ) : (
             <div>

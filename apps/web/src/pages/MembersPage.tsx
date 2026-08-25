@@ -21,6 +21,7 @@ import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
 import { exportMembersToExcel, exportMembersToPdf } from "../lib/export";
 import { MemberDialog } from "../components/MemberDialog";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 
 const ALL_COLUMNS = {
@@ -739,19 +740,13 @@ export function MembersPage() {
                 Spouse is already a church member -- link them
               </label>
               {spouseLinked && (
-                <select
+                <MemberSearchSelect
+                  members={members}
                   value={spouseMemberId}
-                  onChange={(e) => setSpouseMemberId(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  style={{ borderColor: "var(--line)" }}
-                >
-                  <option value="">Choose spouse</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.fullName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSpouseMemberId}
+                  placeholder="Search for the spouse…"
+                  emptyLabel="Choose spouse"
+                />
               )}
             </div>
           )}

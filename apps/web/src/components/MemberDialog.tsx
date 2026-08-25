@@ -15,6 +15,7 @@ import {
 import { useOrg } from "../context/OrgContext";
 import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
+import { MemberSearchSelect } from "./MemberSearchSelect";
 
 // Legacy records (and anything typed without a leading "+") lose their
 // country code on edit unless we re-attach it -- COUNTRIES-derived, same
@@ -446,12 +447,13 @@ export function MemberDialog({ member: initial, members, households, fellowships
                     Spouse is already a church member -- link them
                   </label>
                   {spouseLinked && (
-                    <select value={spouseMemberId} onChange={(e) => setSpouseMemberId(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }}>
-                      <option value="">Choose spouse</option>
-                      {members.filter((m) => m.id !== member.id).map((m) => (
-                        <option key={m.id} value={m.id}>{m.fullName}</option>
-                      ))}
-                    </select>
+                    <MemberSearchSelect
+                      members={members.filter((m) => m.id !== member.id)}
+                      value={spouseMemberId}
+                      onChange={setSpouseMemberId}
+                      placeholder="Search for the spouse…"
+                      emptyLabel="Choose spouse"
+                    />
                   )}
                 </div>
               )}
