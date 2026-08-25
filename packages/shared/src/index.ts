@@ -443,8 +443,9 @@ export interface AttendanceRecordDto {
   id: string;
   sessionId: string;
   memberId: string | null;
-  member?: { id: string; fullName: string };
+  member?: { id: string; fullName: string; phone: string | null };
   visitorName: string | null;
+  visitorPhone: string | null;
   checkedInAt: string;
 }
 
@@ -453,6 +454,7 @@ export interface CreateAttendanceRecordInput {
   id: string;
   memberId?: string;
   visitorName?: string;
+  visitorPhone?: string;
 }
 
 // --- Sprint 3: Import Center -------------------------------------------

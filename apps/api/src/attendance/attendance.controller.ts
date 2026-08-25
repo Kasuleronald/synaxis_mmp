@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import type { SessionUser } from "@life-mmp/shared";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Role, type SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { tenantContextFor } from "../auth/tenant-context";
+import { branchScopeFor, tenantContextFor } from "../auth/tenant-context";
 import { CreateAttendanceSessionDto } from "./dto/create-session.dto";
 import { CheckInDto } from "./dto/check-in.dto";
+import { LinkMemberDto } from "./dto/link-member.dto";
 import { AttendanceService } from "./attendance.service";
 
 @Controller("attendance/sessions")
@@ -19,7 +22,7 @@ export class AttendanceController {
 
   @Get()
   listSessions(@CurrentUser() user: SessionUser) {
-    return this.attendance.listSessions(tenantContextFor(user));
+    return this.attendance.listSessions(tenantContextFor(user), branchScopeFor(user));
   }
 
   @Get(":id")
@@ -38,5 +41,20 @@ export class AttendanceController {
   @Post(":id/check-in")
   checkIn(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: CheckInDto) {
     return this.attendance.checkIn(tenantContextFor(user), id, dto);
+  }
+
+  // Removing a mistaken/duplicate check-in is destructive (unlike checking
+  // someone in), so unlike the rest of this controller it's restricted to
+  // the roles that actually run a session, not every authenticated user.
+  @Delete(":sessionId/records/:recordId")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ORG_ADMIN, Role.DEPARTMENT_HEAD, Role.FELLOWSHIP_LEADER)
+  deleteRecord(@CurrentUser() user: SessionUser, @Param("recordId") recordId: string) {
+    return this.attendance.deleteRecord(tenantContextFor(user), recordId);
+  }
+
+  @Patch(":sessionId/records/:recordId/link-member")
+  linkMember(@CurrentUser() user: SessionUser, @Param("recordId") recordId: string, @Body() dto: LinkMemberDto) {
+    return this.attendance.linkMember(tenantContextFor(user), recordId, dto);
   }
 }

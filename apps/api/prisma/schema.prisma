@@ -427,6 +427,7 @@ model AttendanceRecord {
   memberId       String?
   member         Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
   visitorName    String?
+  visitorPhone   String?
   checkedInAt    DateTime @default(now())
   checkedInById  String?
   checkedInBy    User?    @relation("CheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)

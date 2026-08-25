@@ -17,6 +17,7 @@ export function CheckInPage() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<MemberDto[]>([]);
   const [visitorName, setVisitorName] = useState("");
+  const [visitorPhone, setVisitorPhone] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,12 +77,13 @@ export function CheckInPage() {
       entity: "publicCheckIn",
       operation: "create",
       parentId: token,
-      payload: memberId ? { id, memberId } : { id, visitorName: name },
+      payload: memberId ? { id, memberId } : { id, visitorName: name, visitorPhone: visitorPhone.trim() || undefined },
     });
     setDone(name ?? "You're");
     setSearch("");
     setResults([]);
     setVisitorName("");
+    setVisitorPhone("");
   }
 
   if (error) {
@@ -145,23 +147,32 @@ export function CheckInPage() {
       <p className="text-xs text-center mb-2" style={{ color: "var(--ink-muted)" }}>
         First time here?
       </p>
-      <div className="flex gap-2">
+      <div className="grid gap-2">
         <input
           value={visitorName}
           onChange={(e) => setVisitorName(e.target.value)}
           placeholder="Your full name"
-          className="flex-1 rounded-md border px-3 py-2 text-sm"
+          className="rounded-md border px-3 py-2 text-sm"
           style={{ borderColor: "var(--line)" }}
         />
-        <button
-          type="button"
-          disabled={!visitorName.trim()}
-          onClick={() => checkIn(undefined, visitorName)}
-          className="rounded-md px-4 py-2 text-sm font-medium shrink-0 disabled:opacity-50"
-          style={{ background: "var(--accent)", color: "white" }}
-        >
-          Check in
-        </button>
+        <div className="flex gap-2">
+          <input
+            value={visitorPhone}
+            onChange={(e) => setVisitorPhone(e.target.value)}
+            placeholder="Phone (optional)"
+            className="flex-1 rounded-md border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--line)" }}
+          />
+          <button
+            type="button"
+            disabled={!visitorName.trim()}
+            onClick={() => checkIn(undefined, visitorName)}
+            className="rounded-md px-4 py-2 text-sm font-medium shrink-0 disabled:opacity-50"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            Check in
+          </button>
+        </div>
       </div>
     </CenteredCard>
   );

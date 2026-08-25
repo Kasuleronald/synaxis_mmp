@@ -13,4 +13,8 @@ export class CheckInDto {
   @IsString()
   @MinLength(1)
   visitorName?: string;
+
+  @IsOptional()
+  @IsString()
+  visitorPhone?: string;
 }
