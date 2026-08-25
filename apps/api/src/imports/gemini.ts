@@ -84,6 +84,73 @@ export async function extractMembersWithGemini(text: string): Promise<GeminiExtr
   return Array.isArray(parsed.rows) ? parsed.rows : [];
 }
 
+export interface DateNormalizationResult {
+  rowIndex: number;
+  iso: string;
+}
+
+const DATES_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    dates: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rowIndex: { type: "integer" },
+          iso: { type: "string", description: "YYYY-MM-DD" },
+        },
+        required: ["rowIndex", "iso"],
+      },
+    },
+  },
+  required: ["dates"],
+};
+
+/** Second-pass date normalization (date-parser.ts's deterministic parser is
+ * the first pass, free and instant) for dates of birth that come out in
+ * every format a spreadsheet can hold -- best-effort, never blocks an
+ * import if it fails or isn't configured. */
+export async function normalizeDatesWithGemini(
+  dates: { rowIndex: number; raw: string }[],
+): Promise<DateNormalizationResult[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || dates.length === 0) return [];
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const listing = dates.map((d) => `${d.rowIndex}: "${d.raw}"`).join("\n");
+  const prompt = `Each line below is a row number and a date of birth exactly as typed into a church membership spreadsheet, in an unclear or inconsistent format. Convert each to ISO 8601 (YYYY-MM-DD). These are birth dates -- infer the century sensibly for a 2-digit year and any other ambiguity (nobody here was born in the future or is over 110). If a value genuinely isn't a date or you can't determine it with reasonable confidence, leave that row number out of your response entirely rather than guessing. Do not invent row numbers -- only use the numbers given.\n\n${listing}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: DATES_RESPONSE_SCHEMA },
+      }),
+    },
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json().catch(() => null);
+  const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!jsonText) return [];
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    const validIndexes = new Set(dates.map((d) => d.rowIndex));
+    return Array.isArray(parsed.dates)
+      ? parsed.dates.filter(
+          (r: any) => typeof r.rowIndex === "number" && validIndexes.has(r.rowIndex) && /^\d{4}-\d{2}-\d{2}$/.test(r.iso),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface DuplicateGroup {
   /** rowIndex values (0-based, matching ImportStagingRow.rowIndex) of rows
    * the model believes are the same person. */

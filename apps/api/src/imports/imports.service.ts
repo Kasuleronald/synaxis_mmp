@@ -5,7 +5,8 @@ import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { mapColumns } from "./column-mapper";
 import { parseSheet } from "./sheet-parser";
 import { extractPdfText } from "./pdf-text";
-import { extractMembersWithGemini, findDuplicatesWithGemini, GeminiUnavailableError, type GeminiExtractedRow } from "./gemini";
+import { extractMembersWithGemini, findDuplicatesWithGemini, normalizeDatesWithGemini, GeminiUnavailableError, type GeminiExtractedRow } from "./gemini";
+import { parseDateStringConfidently } from "./date-parser";
 import { UpdateStagingRowDto } from "./dto/update-staging-row.dto";
 
 interface StagedCandidate {
@@ -64,10 +65,18 @@ function normalizeName(raw: string): string {
   return raw.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/** Staging keeps whatever raw date-of-birth string the sheet/AI produced;
- * only at commit time does it become the member's actual birthMonth/Day/Year. */
+/** Staging normalizes dateOfBirth to ISO before the reviewer ever sees it
+ * (see the date-normalization pass in upload()); this just converts that
+ * ISO string into the member's actual birthMonth/Day/Year at commit time.
+ * The raw-string fallback covers a row a reviewer typed something into by
+ * hand that isn't quite ISO but Date can still make sense of. */
 function parseBirthday(raw: string | undefined): { birthMonth?: number; birthDay?: number; birthYear?: number } {
   if (!raw) return {};
+  const iso = parseDateStringConfidently(raw);
+  if (iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return { birthMonth: m, birthDay: d, birthYear: y };
+  }
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return {};
   return { birthMonth: d.getUTCMonth() + 1, birthDay: d.getUTCDate(), birthYear: d.getUTCFullYear() };
@@ -178,6 +187,27 @@ export class ImportsService {
     } catch {
       // Best-effort -- no API key, quota, or a transient failure should
       // never block the import itself, only skip this extra pass.
+    }
+
+    // Dates of birth arrive in whatever format the source spreadsheet used,
+    // often inconsistently row to row. Deterministic parsing (free, instant)
+    // handles anything unambiguous; an AI pass on the rest (Aug 2026: "the
+    // AI should also help reformat the date in case some are in different
+    // formats") catches what that can't -- the reviewer only ever sees a
+    // clean YYYY-MM-DD, never the original raw text, once either resolves it.
+    const needsAiDate: { rowIndex: number; raw: string }[] = [];
+    candidates.forEach((c, i) => {
+      const raw = c.extractedFields.dateOfBirth;
+      if (typeof raw !== "string" || !raw.trim()) return;
+      const confident = parseDateStringConfidently(raw);
+      if (confident) c.extractedFields.dateOfBirth = confident;
+      else needsAiDate.push({ rowIndex: i, raw });
+    });
+    try {
+      const resolvedDates = await normalizeDatesWithGemini(needsAiDate);
+      for (const r of resolvedDates) candidates[r.rowIndex].extractedFields.dateOfBirth = r.iso;
+    } catch {
+      // Best-effort, same reasoning as the duplicate-detection pass above.
     }
 
     return runWithTenant(this.prisma, ctx, async (tx) => {
