@@ -5,7 +5,18 @@ import { cacheSession, getCachedSession } from "../lib/db";
 
 const PLATFORM_ADMIN_IDLE_MS = 5 * 60 * 1000;
 const OTHER_ROLES_IDLE_MS = 10 * 60 * 1000;
-const ACTIVITY_EVENTS = ["mousedown", "keydown", "wheel", "touchstart"] as const;
+// "scroll" deliberately isn't paired with { passive: true } like a normal
+// scroll listener would be -- it doesn't need to touch the DOM, just note
+// that activity happened, so the extra listener option isn't worth it here.
+// Bubble-phase events (mousedown, keydown, wheel, touchstart) cover clicks,
+// typing, and scrolling on the page itself; "scroll" itself is added in the
+// capture phase specifically because scroll events do NOT bubble up to
+// window the way clicks and keypresses do -- without capture, scrolling
+// inside any inner scrollable pane (a table, a modal body, the main content
+// area under a fixed sidebar) would never reset the timer at all, which
+// read to users as being logged out "despite" scrolling and clicking.
+const BUBBLE_ACTIVITY_EVENTS = ["mousedown", "keydown", "wheel", "touchstart", "pointerdown", "mousemove"] as const;
+const CAPTURE_ACTIVITY_EVENTS = ["scroll"] as const;
 
 interface AuthState {
   user: SessionUser | null;
@@ -63,17 +74,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const idleMs = user.role === Role.PLATFORM_ADMIN ? PLATFORM_ADMIN_IDLE_MS : OTHER_ROLES_IDLE_MS;
     let timer: ReturnType<typeof setTimeout>;
+    // mousemove/scroll can fire dozens of times a second -- resetting the
+    // real timer on every single one is wasted work for no behavioral
+    // difference, so activity is only acknowledged at most once/second.
+    let lastReset = 0;
 
     function resetTimer() {
+      const now = Date.now();
+      if (now - lastReset < 1000) return;
+      lastReset = now;
       clearTimeout(timer);
       timer = setTimeout(logout, idleMs);
     }
 
     resetTimer();
-    ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, resetTimer));
+    BUBBLE_ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, resetTimer));
+    CAPTURE_ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, resetTimer, true));
     return () => {
       clearTimeout(timer);
-      ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, resetTimer));
+      BUBBLE_ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, resetTimer));
+      CAPTURE_ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, resetTimer, true));
     };
   }, [user, logout]);
 
