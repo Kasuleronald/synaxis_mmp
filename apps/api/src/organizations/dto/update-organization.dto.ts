@@ -68,6 +68,11 @@ export class UpdateOrganizationDto {
   @MaxLength(50)
   departmentTerm?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  devotionalTerm?: string;
+
   // Display-only currency toggle for finance screens -- never touches
   // stored amounts/currency, not historical-rate-aware (an accepted,
   // documented tradeoff). An empty string clears it back to "off".

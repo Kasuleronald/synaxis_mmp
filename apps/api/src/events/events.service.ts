@@ -16,10 +16,16 @@ export class EventsService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Every event gets a linked attendance session at creation time (Aug 2026:
+   * "when events are entered, there must be a link created for the public to
+   * register their attendance") -- reuses the existing check-in/QR
+   * infrastructure entirely rather than a parallel registration system, so
+   * the public link is just this session's already-working /checkin/:token
+   * page. */
   async create(ctx: TenantContext, dto: CreateEventDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
-    return runWithTenant(this.prisma, ctx, (tx) =>
-      tx.event.create({
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const event = await tx.event.create({
         data: {
           organizationId: ctx.organizationId as string,
           branchId: dto.branchId,
@@ -29,14 +35,31 @@ export class EventsService {
           startsAt: new Date(dto.startsAt),
           endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
         },
-      }),
-    );
+      });
+      const session = await tx.attendanceSession.create({
+        data: {
+          organizationId: ctx.organizationId as string,
+          branchId: dto.branchId,
+          eventId: event.id,
+          name: event.title,
+          date: event.startsAt,
+        },
+        select: { id: true, qrToken: true },
+      });
+      return { ...event, attendanceSessions: [session] };
+    });
   }
 
   /** Upcoming first (dashboard widget), then most-recent past. */
   async list(ctx: TenantContext) {
     return runWithTenant(this.prisma, ctx, (tx) =>
-      tx.event.findMany({ orderBy: { startsAt: "asc" }, include: { debrief: { select: { id: true } } } }),
+      tx.event.findMany({
+        orderBy: { startsAt: "asc" },
+        include: {
+          debrief: { select: { id: true } },
+          attendanceSessions: { select: { id: true, qrToken: true }, take: 1, orderBy: { createdAt: "asc" } },
+        },
+      }),
     );
   }
 

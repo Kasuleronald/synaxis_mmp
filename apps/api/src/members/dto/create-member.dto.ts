@@ -12,7 +12,7 @@ import {
   Min,
   MinLength,
 } from "class-validator";
-import { Gender, HouseholdRole, LeadershipRole, MaritalStatus, MemberStatus } from "@life-mmp/shared";
+import { Gender, HouseholdRole, LeadershipRole, MaritalStatus, MemberStatus, WorkingStatus } from "@life-mmp/shared";
 
 export class CreateMemberDto {
   // Client-generated (uuid v4) so a visitor can be registered offline and
@@ -79,6 +79,10 @@ export class CreateMemberDto {
   @IsOptional()
   @IsEnum(MaritalStatus)
   maritalStatus?: MaritalStatus;
+
+  @IsOptional()
+  @IsEnum(WorkingStatus)
+  workingStatus?: WorkingStatus;
 
   @IsOptional()
   @IsBoolean()

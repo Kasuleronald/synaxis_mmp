@@ -57,6 +57,7 @@ model Organization {
   householdTerm  String?
   fellowshipTerm String?
   departmentTerm String?
+  devotionalTerm String?
   // Atomically incremented (UPDATE ... SET memberNumberSeq = memberNumberSeq
   // + 1 RETURNING) inside the same transaction as a member create -- that's
   // what makes allocation race-safe under concurrent registrations without
@@ -99,6 +100,9 @@ model Organization {
   requisitionAccountabilities RequisitionAccountability[]
   eventDebriefs          EventDebrief[]
   testimonies            Testimony[]
+  devotionals            Devotional[]
+  soulWinningRecords     SoulWinningRecord[]
+  serviceUnits           ServiceUnit[]
 
   // Optional lightweight display-only currency toggle for finance screens --
   // recomputes *displayed* amounts using this admin-set rate, never touches
@@ -133,6 +137,8 @@ model Branch {
   discipleshipClasses DiscipleshipClass[]
   givingRecords      GivingRecord[]
   fixedAssets        FixedAsset[]
+  soulWinningRecords SoulWinningRecord[]
+  serviceUnits       ServiceUnit[]
 
   @@index([organizationId])
   @@map("branches")
@@ -172,6 +178,9 @@ model User {
   // ordinary staff logins, not a distinct system role.
   isPastor Boolean @default(false)
   isFellowshipsDepartmentHead Boolean @default(false)
+  // Same appointment model again -- edits the org's Daily Devotional
+  // without needing Org Admin access.
+  isDevotionalEditor Boolean @default(false)
   // Set when a Platform Admin generates a reset link for an org's admin
   // (no email sending yet -- Section: "no forgot password option"). Single
   // active token, cleared once used or replaced by a newer request.
@@ -208,6 +217,8 @@ model User {
   accountabilitiesReviewed   RequisitionAccountability[] @relation("AccountabilityReviewedBy")
   eventDebriefsSubmitted     EventDebrief[] @relation("EventDebriefSubmittedBy")
   testimoniesSubmitted       Testimony[] @relation("TestimonySubmittedBy")
+  devotionalsAuthored        Devotional[] @relation("DevotionalAuthoredBy")
+  soulsFollowingUp           SoulWinningRecord[] @relation("SoulWinningAssignee")
   notifications            Notification[]
 
   @@index([organizationId])
@@ -247,6 +258,13 @@ enum MaritalStatus {
   MARRIED
   DIVORCED
   WIDOWED
+}
+
+enum WorkingStatus {
+  EMPLOYED
+  SELF_EMPLOYED
+  UNEMPLOYED
+  STUDYING
 }
 
 /// A family unit. Members join a household with their own role in it --
@@ -306,6 +324,7 @@ model Member {
   birthDay       Int?
   birthYear      Int?
   maritalStatus  MaritalStatus?
+  workingStatus  WorkingStatus?
   isStudent      Boolean?
   school         String?
   phone          String?
@@ -336,6 +355,8 @@ model Member {
   givingRecords      GivingRecord[]
   pledges            Pledge[]
   fellowshipReportAttendance FellowshipReportAttendee[]
+  soulWinningRecord  SoulWinningRecord?
+  serviceUnitMemberships ServiceUnitMember[]
 
   @@unique([organizationId, memberNumber])
   @@index([organizationId])
@@ -534,6 +555,7 @@ model Fellowship {
   members Member[]
   reports FellowshipReport[]
   fundRequisitions FundRequisition[]
+  soulWinningRecords SoulWinningRecord[]
 
   @@index([organizationId])
   @@map("fellowships")
@@ -668,6 +690,7 @@ model DiscipleshipClass {
 
   enrollments        ClassEnrollment[]
   attendanceSessions AttendanceSession[]
+  soulWinningRecords SoulWinningRecord[]
 
   @@index([organizationId])
   @@index([programId])
@@ -1348,4 +1371,132 @@ model Testimony {
 
   @@index([organizationId])
   @@map("testimonies")
+}
+
+// --- Daily Devotional (Aug 2026) ----------------------------------------
+
+/// One entry per calendar day per org -- "today's devotional" is a plain
+/// unique lookup. Authored by whoever holds User.isDevotionalEditor (or an
+/// Org Admin); read by everyone signed in.
+model Devotional {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  date           DateTime
+  title          String
+  scripture      String?
+  body           String
+  authorId       String?
+  author         User?    @relation("DevotionalAuthoredBy", fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+  @@map("devotionals")
+}
+
+// --- Soul Winning (Aug 2026) ---------------------------------------------
+
+enum SoulWinningStage {
+  WON
+  ATTENDING_PROGRAMS
+  VISITED
+  ALLOCATED_TO_FELLOWSHIP
+  ENROLLED_NEW_BELIEVERS_CLASS
+  COMPLETED_NEW_BELIEVERS_CLASS
+}
+
+/// A person won in evangelism, tracked through the stages "attending
+/// programs -> visited -> allocated to a fellowship/cell -> enrolled in and
+/// completing a new believers class" until fully integrated. Becomes a real
+/// Member (memberId set) once formally added -- same "not-yet-a-Member ->
+/// Member" pattern as attendance check-in's walk-in-to-member conversion,
+/// rather than a parallel identity that has to be merged later.
+model SoulWinningRecord {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  fullName       String
+  phone          String?
+  address        String?
+  wonAt          DateTime @default(now())
+  wonWhere       String?
+  stage          SoulWinningStage @default(WON)
+  // Who/which team is responsible for following this person up -- same
+  // assignee idea as FollowUp.assignedToId, kept separate since a soul-
+  // winning record tracks a different, longer pipeline than a single
+  // pastoral follow-up note.
+  assignedToId   String?
+  assignedTo     User?    @relation("SoulWinningAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  fellowshipId   String?
+  fellowship     Fellowship? @relation(fields: [fellowshipId], references: [id], onDelete: SetNull)
+  classId        String?
+  class          DiscipleshipClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  memberId       String?  @unique
+  member         Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  stageHistory SoulWinningStageChange[]
+
+  @@index([organizationId])
+  @@map("soul_winning_records")
+}
+
+/// Every stage transition, logged -- "must be tracked very well" per the
+/// request, not just a single current-stage field with no history.
+model SoulWinningStageChange {
+  id        String   @id @default(uuid())
+  recordId  String
+  record    SoulWinningRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  stage     SoulWinningStage
+  note      String?
+  changedAt DateTime @default(now())
+
+  @@index([recordId])
+  @@map("soul_winning_stage_changes")
+}
+
+// --- Service Units (Aug 2026) ---------------------------------------------
+
+/// Teams that serve in services and programs (examples given: Media,
+/// Ushers, Protocol, Music, Children, Devotional) -- not a fixed enum, an
+/// org adds whichever units it actually runs, same flat-list-under-a-branch
+/// pattern as Fellowship. Attendance/absenteeism for a unit's members is
+/// computed from the existing AttendanceRecord data (whether each member
+/// has a check-in for each session in range), not a parallel check-in
+/// system -- a service unit member checks in the same way anyone else does.
+model ServiceUnit {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name           String
+  description    String?
+  leaderId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members ServiceUnitMember[]
+
+  @@index([organizationId])
+  @@map("service_units")
+}
+
+model ServiceUnitMember {
+  id            String   @id @default(uuid())
+  serviceUnitId String
+  serviceUnit   ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  memberId      String
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  joinedAt      DateTime @default(now())
+
+  @@unique([serviceUnitId, memberId])
+  @@index([serviceUnitId])
+  @@map("service_unit_members")
 }

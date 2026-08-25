@@ -105,6 +105,7 @@ function buildNavGroups(
         { label: terms.member, to: "/members" },
         { label: terms.household, to: "/households" },
         { label: "Follow-up", to: "/follow-ups" },
+        { label: "Soul Winning", to: "/soul-winning" },
         { label: "Import Center", to: "/imports" },
         { label: "Registrations", to: "/registrations" },
       ],
@@ -117,14 +118,15 @@ function buildNavGroups(
         { label: terms.fellowship, to: "/fellowships" },
         { label: `${terms.fellowship} reports`, to: "/fellowships/reports" },
         { label: terms.department, to: "/departments" },
+        { label: "Service Units", to: "/service-units" },
       ],
     },
     {
-      label: "Discipleship",
+      label: "Trainings",
       icon: DiscipleshipIcon,
       items: [
         { label: "Programs", to: "/discipleship/programs" },
-        { label: "Classes", to: "/discipleship/classes" },
+        { label: "Classes & Discipleship", to: "/discipleship/classes" },
       ],
     },
     {
@@ -157,6 +159,7 @@ function buildNavGroups(
       items: [
         { label: "Announcements", to: "/announcements" },
         { label: "Testimonies", to: "/testimonies" },
+        { label: terms.devotional, to: "/devotional" },
       ],
     },
     { label: "Reports", icon: ReportsIcon, items: [{ label: "Analytics", to: "/reports" }] },
@@ -183,7 +186,7 @@ const SETUP_GROUP: { label: string; icon: IconComponent; items: NavItem[] } = {
 // are fine here, this never renders.
 const ALL_NAV_PATHS: string[] = [
   "/",
-  ...buildNavGroups({ member: "", household: "", fellowship: "", department: "" }).flatMap((g) =>
+  ...buildNavGroups({ member: "", household: "", fellowship: "", department: "", devotional: "" }).flatMap((g) =>
     g.items.map((i) => i.to).filter((to): to is string => !!to),
   ),
   ...SETUP_GROUP.items.map((i) => i.to).filter((to): to is string => !!to),

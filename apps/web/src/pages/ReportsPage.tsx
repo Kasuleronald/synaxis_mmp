@@ -21,7 +21,7 @@ import {
 } from "@life-mmp/shared";
 import { useOrg } from "../context/OrgContext";
 import { api } from "../lib/api";
-import { exportAttendanceToExcel, exportAttendanceToPdf } from "../lib/export";
+import { exportAttendanceToExcel, exportAttendanceToPdf, exportRowsToExcel } from "../lib/export";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
 
 function formatMoney(amount: number | string, currency: string) {
@@ -43,10 +43,35 @@ function Bar({ label, value, max, formatValue }: { label: string; value: number;
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({
+  title,
+  children,
+  exportRows,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** Row data to offer as an Excel download -- omit for cards with nothing
+   * tabular to export (e.g. a picker, not a result). Untyped on purpose:
+   * every report's row shape is different, and this only ever passes
+   * through to a generic key/value sheet writer. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  exportRows?: any[];
+}) {
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
-      <h3 className="text-sm font-semibold mb-3">{title}</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {exportRows && (
+          <button
+            type="button"
+            onClick={() => exportRowsToExcel(exportRows, title)}
+            className="text-xs underline shrink-0"
+            style={{ color: "var(--accent-ink)" }}
+          >
+            Export
+          </button>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -85,34 +110,34 @@ function OverviewTab() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Member growth (new members per month)">
+      <Card title="Member growth (new members per month)" exportRows={growth}>
         {growth.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No members recorded yet.</p>}
         {growth.map((g) => (
           <Bar key={g.month} label={g.month} value={g.newMembers} max={growthMax} formatValue={(v) => `${v} (${g.cumulative} total)`} />
         ))}
       </Card>
-      <Card title="Attendance trend (check-ins per month)">
+      <Card title="Attendance trend (check-ins per month)" exportRows={attendance}>
         {attendance.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No attendance recorded yet.</p>}
         {attendance.map((a) => (
           <Bar key={a.period} label={a.period.slice(0, 7)} value={a.count} max={attendanceMax} formatValue={(v) => String(v)} />
         ))}
       </Card>
-      <Card title="Membership status">
+      <Card title="Membership status" exportRows={demographics?.byStatus}>
         {demographics?.byStatus.map((b) => (
           <Bar key={b.label} label={b.label} value={b.count} max={demographics.total || 1} formatValue={(v) => String(v)} />
         ))}
       </Card>
-      <Card title="Gender">
+      <Card title="Gender" exportRows={demographics?.byGender}>
         {demographics?.byGender.map((b) => (
           <Bar key={b.label} label={b.label} value={b.count} max={demographics.total || 1} formatValue={(v) => String(v)} />
         ))}
       </Card>
-      <Card title="Marital status">
+      <Card title="Marital status" exportRows={demographics?.byMaritalStatus}>
         {demographics?.byMaritalStatus.map((b) => (
           <Bar key={b.label} label={b.label} value={b.count} max={demographics.total || 1} formatValue={(v) => String(v)} />
         ))}
       </Card>
-      <Card title="Age group">
+      <Card title="Age group" exportRows={demographics?.byAgeGroup}>
         {demographics?.byAgeGroup.map((b) => (
           <Bar key={b.label} label={b.label} value={b.count} max={demographics.total || 1} formatValue={(v) => String(v)} />
         ))}
@@ -144,19 +169,19 @@ function GivingTab({ currency }: { currency: string }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Giving trend (total per month)">
+      <Card title="Giving trend (total per month)" exportRows={trend}>
         {trend.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Nothing recorded yet.</p>}
         {trend.map((t) => (
           <Bar key={t.period} label={t.period.slice(0, 7)} value={t.total} max={trendMax} formatValue={(v) => formatMoney(v, currency)} />
         ))}
       </Card>
-      <Card title="By category (all time)">
+      <Card title="By category (all time)" exportRows={byCategory}>
         {byCategory.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Nothing recorded yet.</p>}
         {byCategory.map((c) => (
           <Bar key={c.categoryId} label={c.name} value={c.total} max={categoryMax} formatValue={(v) => formatMoney(v, currency)} />
         ))}
       </Card>
-      <Card title="By fund (all time)">
+      <Card title="By fund (all time)" exportRows={byFund}>
         {byFund.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Nothing recorded yet.</p>}
         {byFund.map((f) => (
           <Bar key={f.fundId ?? "none"} label={f.name} value={f.total} max={fundMax} formatValue={(v) => formatMoney(v, currency)} />
@@ -199,7 +224,16 @@ function StatementsTab({ currency }: { currency: string }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Member giving statement">
+      <Card
+        title="Member giving statement"
+        exportRows={memberStatement?.lines.map((l) => ({
+          Date: l.givenAt,
+          Category: l.category?.name ?? "",
+          Amount: l.amount,
+          Currency: l.currency,
+          "Running total": l.runningTotal,
+        }))}
+      >
         <div className="mb-3">
           <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="Choose a member" />
         </div>
@@ -228,7 +262,16 @@ function StatementsTab({ currency }: { currency: string }) {
           </div>
         )}
       </Card>
-      <Card title="Fund statement">
+      <Card
+        title="Fund statement"
+        exportRows={fundStatement?.lines.map((l) => ({
+          Date: l.givenAt,
+          Giver: l.member?.fullName ?? l.giverName ?? "Anonymous",
+          Amount: l.amount,
+          Currency: l.currency,
+          "Running total": l.runningTotal,
+        }))}
+      >
         <select value={fundId} onChange={(e) => setFundId(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm mb-3" style={{ borderColor: "var(--line)" }}>
           <option value="">Choose a fund</option>
           {funds.map((f) => (
@@ -336,7 +379,10 @@ function AttendanceListsTab() {
           </button>
         </div>
       </Card>
-      <Card title="Individual attendance">
+      <Card
+        title="Individual attendance"
+        exportRows={memberAttendance?.lines.map((l) => ({ Session: l.sessionName, "Checked in at": l.checkedInAt }))}
+      >
         <div className="mb-3">
           <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="Choose a member" />
         </div>
@@ -377,7 +423,16 @@ function PledgesTab({ currency }: { currency: string }) {
   }, []);
 
   return (
-    <Card title="Pledge fulfillment">
+    <Card
+      title="Pledge fulfillment"
+      exportRows={pledges.map((p) => ({
+        Member: p.member?.fullName ?? "—",
+        Fund: p.fund?.name ?? "General",
+        Fulfilled: p.fulfilledAmount,
+        Pledged: p.amount,
+        Currency: p.currency,
+      }))}
+    >
       {pledges.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No pledges yet.</p>}
       {pledges.map((p) => (
         <Bar
@@ -415,13 +470,13 @@ function AssetsTab({ currency }: { currency: string }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title={`Current value by category (total ${formatMoney(totalValue, currency)})`}>
+      <Card title={`Current value by category (total ${formatMoney(totalValue, currency)})`} exportRows={byCategory}>
         {byCategory.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No assets recorded yet.</p>}
         {byCategory.map((c) => (
           <Bar key={c.category} label={FIXED_ASSET_CATEGORY_LABELS[c.category as keyof typeof FIXED_ASSET_CATEGORY_LABELS]} value={c.total} max={categoryMax} formatValue={(v) => formatMoney(v, currency)} />
         ))}
       </Card>
-      <Card title="Condition across all branches">
+      <Card title="Condition across all branches" exportRows={byCondition}>
         {byCondition.length === 0 && <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No assets recorded yet.</p>}
         {byCondition.map((c) => (
           <Bar key={c.condition} label={ASSET_CONDITION_LABELS[c.condition as keyof typeof ASSET_CONDITION_LABELS]} value={c.count} max={assets.length || 1} formatValue={(v) => String(v)} />
@@ -438,7 +493,18 @@ function LeadersTab({ currency }: { currency: string }) {
   }, []);
 
   return (
-    <Card title="Fellowship leader performance">
+    <Card
+      title="Fellowship leader performance"
+      exportRows={rows.map((r) => ({
+        Leader: r.leaderName,
+        Fellowships: r.fellowships.join(", "),
+        "Reports submitted": r.reportsSubmitted,
+        Approved: r.approved,
+        Rejected: r.rejected,
+        "Avg. attendance": r.averageAttendance,
+        "Giving approved": r.givingApproved,
+      }))}
+    >
       {rows.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No fellowship reports submitted yet.</p>
       ) : (

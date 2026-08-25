@@ -12,5 +12,6 @@ export function useTerminology() {
     household: org?.householdTerm || "Households",
     fellowship: org?.fellowshipTerm || "Fellowships",
     department: org?.departmentTerm || "Departments",
+    devotional: org?.devotionalTerm || "Daily Devotional",
   };
 }

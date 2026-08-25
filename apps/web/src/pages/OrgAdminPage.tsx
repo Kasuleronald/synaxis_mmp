@@ -115,6 +115,11 @@ export function OrgAdminPage() {
     setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
   }
 
+  async function onToggleDevotionalEditorGrant(u: UserDto) {
+    const updated = await api.patch<UserDto>(`/users/${u.id}`, { isDevotionalEditor: !u.isDevotionalEditor });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+  }
+
   async function onInviteUser(e: FormEvent) {
     e.preventDefault();
     setUserError(null);
@@ -428,6 +433,19 @@ export function OrgAdminPage() {
                       }
                     >
                       {u.isFellowshipsDepartmentHead ? "Fellowships dept. head ✓" : "Make Fellowships dept. head"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleDevotionalEditorGrant(u)}
+                      title="Lets them write/edit the Daily Devotional"
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={
+                        u.isDevotionalEditor
+                          ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                          : { background: "var(--surface-2)", color: "var(--ink-muted)" }
+                      }
+                    >
+                      {u.isDevotionalEditor ? "Devotional editor ✓" : "Make devotional editor"}
                     </button>
                   </>
                 )}

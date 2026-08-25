@@ -30,6 +30,9 @@ import { BirthdaysModule } from "./birthdays/birthdays.module";
 import { PartnersModule } from "./partners/partners.module";
 import { RequisitionsModule } from "./requisitions/requisitions.module";
 import { TestimoniesModule } from "./testimonies/testimonies.module";
+import { DevotionalsModule } from "./devotionals/devotionals.module";
+import { SoulWinningModule } from "./soul-winning/soul-winning.module";
+import { ServiceUnitsModule } from "./service-units/service-units.module";
 
 @Module({
   imports: [
@@ -78,6 +81,9 @@ import { TestimoniesModule } from "./testimonies/testimonies.module";
     PartnersModule,
     RequisitionsModule,
     TestimoniesModule,
+    DevotionalsModule,
+    SoulWinningModule,
+    ServiceUnitsModule,
   ],
   controllers: [AppController],
 })

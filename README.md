@@ -2,7 +2,52 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-20, ~21:00 (pushed to GitHub, made the app production-ready for Webuzo -- see `DEPLOY.md`)
+**Last updated:** 2026-08-26 (Trainings/Daily Devotional/Soul Winning/Service Units, plus everything since 08-20 -- see the two new sections right below, newest first)
+
+## 2026-08-26 — Trainings, Daily Devotional, Soul Winning, Service Units, event registration links, export-all-reports
+
+You asked for a big batch and said to use my judgment and check in when you're back, so here's exactly what landed, with the calls I made on your behalf flagged clearly.
+
+- **"Discipleship" renamed to "Trainings"** in the sidebar (icon unchanged) -- still holds Programs and Classes underneath; I read "Classes & discipleship" as describing what the existing Classes page already is, not a request for a third item, so I didn't add one.
+- **Working status on members** -- new field (Employed / Self-employed / Unemployed / Still studying) on both the Add and Edit member forms and the member detail view.
+- **Daily Devotional** -- new sidebar item under Communications. One entry per calendar day; only an Org Admin or a user granted the new "devotional editor" appointment (Org Admin → Staff & Roles, same additive-grant pattern as Pastor/Fellowships-dept-head) can write or update it; everyone signed in can read today's and browse past ones. Its label is now in Settings → Terminology too, so you can rename "Daily Devotional" to whatever your church calls it.
+- **Events now auto-create their public attendance link** -- creating an event immediately creates a linked attendance session behind the scenes, reusing 100% of the existing check-in/QR infrastructure (the same `/checkin/:token` page, walk-in phone capture, duplicate prevention, delete) rather than a second parallel system. The Events list shows an "Attendance link" next to each event straight to that session.
+- **Soul Winning** (People → Soul Winning) -- a new pipeline tracking a person won in evangelism through the stages you described: attending church programs → being visited → allocated to a fellowship/cell → enrolled in a new believers class → completed. Every stage change is logged (not just overwritten), someone can be assigned to follow a person up (reassignable at any point), and once they've completed the class there's an "Add as a member" action that promotes them into a real Member record -- same walk-in-to-member pattern already used on the Attendance page.
+- **Service Units** (Ministry → Service Units) -- Media/Ushers/Protocol/Music/Children/Devotional are offered as one-click suggestions when you add your first one, but nothing is pre-seeded -- add whichever ones you actually run. Add members to a unit, then pull an attendance/absenteeism report for the whole unit or any one member -- this reads from the same check-in data everyone already generates by checking in normally, no separate roll-call system.
+- **Export everywhere in Reports → Analytics** -- every report card (member growth, attendance trend, demographics, giving trend/by-category/by-fund, statements, pledges, fixed assets, fellowship leaderboard) now has its own "Export" link, downloading that card's data as Excel.
+
+**A real bug I hit and fixed while verifying this batch, worth knowing about:** the four new enum-typed columns (working status, soul-winning stage) initially got created as plain text columns instead of real Postgres enum types in the migration -- Prisma's generated client expects a real matching database type and every write 500'd until I caught it. Fixed in the migration file itself (so a fresh `prisma migrate deploy` -- production included -- creates it correctly the first time) and corrected the already-applied local database directly. Caught this by actually exercising every new endpoint with real API calls, not just type-checking, which is exactly the kind of thing type-checking alone can never catch.
+
+Also fixed in passing: `apps/web/src/lib/api.ts` was throwing a raw JSON-parse error on any endpoint that legitimately returns `null` with an empty body (first hit by "no devotional posted yet" today, but this was a latent bug that could have surfaced anywhere) -- now treated as a normal `null` result.
+
+**Verification**: every new backend endpoint (member working status, org devotional-term, devotional upsert/get/history, event auto-session, service unit create/add-member/attendance-report, and the full soul-winning pipeline create → advance through all four stages → convert to member) was exercised end-to-end with real API calls against a throwaway test org, cleaned up after. All new/changed pages (Daily Devotional, Soul Winning, Service Units + detail, Events, Settings, Org Admin, Members) were also loaded in a real browser -- no console errors, no crash text -- and the Add Member form was confirmed to show the new Working status field.
+
+**Not done, worth deciding on when you're back:**
+- Soul Winning and Service Units have no maker-checker deletion flow (matching Fellowships etc.) -- only create/edit exists for now.
+- No branch-scoping decision was re-litigated for the three new modules -- they follow the same org-wide-with-an-optional-branchId shape as Fellowship/Branch already do.
+- The "Export" links in Reports write a generic key/value Excel sheet (whatever the card already shows), not a branded PDF like the Members export -- extending the branded-PDF pattern here would be quick if you want it to match.
+
+## Also since 2026-08-20 (condensed -- see git log for full detail)
+
+A lot landed between the 08-20 snapshot below and today that this file never got updated for. In roughly chronological order:
+
+- **Sidebar collapse-to-icon-rail toggle**, separate from the per-section chevrons -- then a real production mobile-layout regression it caused (an inline style silently overrode the mobile drawer's positioning classes) was found from a screenshot and fixed same-day.
+- **Member numbers can be typed in directly**, not just auto-allocated, with collision-safe fallback numbering.
+- **Branches**: can now be edited, reassigned as the org's "main" branch, and given a leader (mirrors Fellowship's leader pattern exactly).
+- **Import Center, several rounds**: expanded to actually use every field it was extracting (status/gender/nationality/marital status now really land on the committed member, previously silently dropped); a review-issues dialog now pops up automatically summarizing duplicates and bad dates before you approve anything, with a one-click "skip all flagged duplicates"; batch checkboxes for bulk approve/skip; fixed a real silent-truncation bug where only the workbook's *first sheet* was ever read (a file with data split across two tabs silently lost everything past Sheet 1); AI-assisted (Gemini) duplicate detection and date-format normalization on top of the existing deterministic passes; the AI calls were 404ing because the hardcoded default model (`gemini-2.0-flash`) had been retired -- switched to `gemini-3.6-flash`.
+- **Fixed Assets**: up to 4 reference photos per asset, capped and delete-to-replace, auto-optimized on upload.
+- **Attendance**: walk-in phone capture, duplicate check-in prevention, a delete icon on the attendance list, and a walk-in "Add as a member" action.
+- **Reports**: per-event attendance list export, individual member attendance history, and a first pass at branch-scoping (Org Admin/Finance Officer see every branch; other roles see only their own).
+- **Fellowship reports**: every submission now also routes to the Org Admin, whoever's appointed Pastor, and the Fellowships department head -- three new additive Staff & Roles grants, same pattern as `isDeletionApprover`.
+- **Searchable member picker everywhere** a plain dropdown used to list the whole member directory (spouse link, household head, a pledge's member, both Reports member-pickers) -- a bare `<select>` stopped being usable well before a few hundred members.
+- **Idle-logout fix**: `scroll` events don't bubble to `window` the way clicks do, so scrolling inside any inner scrollable pane never reset the timer -- people were being logged out despite actively scrolling and clicking. Fixed with a capture-phase listener, proved with a side-by-side test harness.
+- **Email notifications over SMTP** from `synaxis@scholarsas.com`, alongside (not instead of) the existing in-app bell notifications -- best-effort and fire-and-forget so a slow mail server can never block or delay whatever triggered it.
+- **User guide PDF** (Settings → download), later trimmed to remove the Platform Administrator chapter on request.
+- Required fields tightened (name/phone/address on member add/edit and self-registration), the notification bell now closes on any outside click, and the Members list's Columns/Export dropdowns now close on outside click too.
+
+---
+
+**Snapshot below is the 2026-08-20 state** -- everything above this line is what's changed since.
 
 ## Running it locally
 

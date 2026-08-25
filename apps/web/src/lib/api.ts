@@ -20,7 +20,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, body.message ?? "Request failed");
   }
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  // A handler returning `null` (e.g. "no devotional posted for this date
+  // yet") comes back as a genuinely empty body, not the literal text
+  // "null" -- res.json() throws on that ("Unexpected end of JSON input"),
+  // so parse manually and treat empty as null instead.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 async function upload<T>(path: string, file: File): Promise<T> {

@@ -35,6 +35,7 @@ export function SettingsPage() {
   const [householdTerm, setHouseholdTerm] = useState("");
   const [fellowshipTerm, setFellowshipTerm] = useState("");
   const [departmentTerm, setDepartmentTerm] = useState("");
+  const [devotionalTerm, setDevotionalTerm] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoDataUri, setLogoDataUri] = useState<string | undefined>(undefined);
   const [secondaryCurrency, setSecondaryCurrency] = useState("");
@@ -63,6 +64,7 @@ export function SettingsPage() {
     setHouseholdTerm(org.householdTerm ?? "");
     setFellowshipTerm(org.fellowshipTerm ?? "");
     setDepartmentTerm(org.departmentTerm ?? "");
+    setDevotionalTerm(org.devotionalTerm ?? "");
     setLogoPreview(org.logoUrl);
     setSecondaryCurrency(org.secondaryCurrency ?? "");
     setSecondaryCurrencyRate(org.secondaryCurrencyRate != null ? String(org.secondaryCurrencyRate) : "");
@@ -110,7 +112,7 @@ export function SettingsPage() {
     setTermMessage(null);
     setSavingTerms(true);
     try {
-      await update({ memberTerm, householdTerm, fellowshipTerm, departmentTerm });
+      await update({ memberTerm, householdTerm, fellowshipTerm, departmentTerm, devotionalTerm });
       setTermMessage("Terminology saved.");
     } catch (err) {
       setTermError(err instanceof ApiError ? err.message : "Something went wrong.");
@@ -459,6 +461,16 @@ export function SettingsPage() {
               value={departmentTerm}
               onChange={(e) => setDepartmentTerm(e.target.value)}
               placeholder="Directorates & departments"
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">"Daily Devotional"</label>
+            <input
+              value={devotionalTerm}
+              onChange={(e) => setDevotionalTerm(e.target.value)}
+              placeholder="Daily Devotional"
               className="w-full rounded-md border px-3 py-2 text-sm"
               style={{ borderColor: "var(--line)" }}
             />

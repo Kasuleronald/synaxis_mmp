@@ -42,6 +42,10 @@ import { FixedAssetsPage } from "./pages/FixedAssetsPage";
 import { PartnersPage } from "./pages/PartnersPage";
 import { RequisitionsPage } from "./pages/RequisitionsPage";
 import { TestimoniesPage } from "./pages/TestimoniesPage";
+import { DevotionalPage } from "./pages/DevotionalPage";
+import { SoulWinningPage } from "./pages/SoulWinningPage";
+import { ServiceUnitsPage } from "./pages/ServiceUnitsPage";
+import { ServiceUnitDetailPage } from "./pages/ServiceUnitDetailPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -159,6 +163,10 @@ export default function App() {
             <Route path="/finance/partners" element={<RequireAuth><RequireOrgMember><PartnersPage /></RequireOrgMember></RequireAuth>} />
             <Route path="/finance/requisitions" element={<RequireAuth><RequireOrgMember><RequisitionsPage /></RequireOrgMember></RequireAuth>} />
             <Route path="/testimonies" element={<RequireAuth><RequireOrgMember><TestimoniesPage /></RequireOrgMember></RequireAuth>} />
+            <Route path="/devotional" element={<RequireAuth><RequireOrgMember><DevotionalPage /></RequireOrgMember></RequireAuth>} />
+            <Route path="/soul-winning" element={<RequireAuth><RequireOrgMember><SoulWinningPage /></RequireOrgMember></RequireAuth>} />
+            <Route path="/service-units" element={<RequireAuth><RequireOrgMember><ServiceUnitsPage /></RequireOrgMember></RequireAuth>} />
+            <Route path="/service-units/:id" element={<RequireAuth><RequireOrgMember><ServiceUnitDetailPage /></RequireOrgMember></RequireAuth>} />
             <Route path="/reports" element={<RequireAuth><RequireOrgMember><ReportsPage /></RequireOrgMember></RequireAuth>} />
             <Route path="/announcements" element={<RequireAuth><RequireOrgMember><AnnouncementsPage /></RequireOrgMember></RequireAuth>} />
             <Route path="/registrations" element={<RequireAuth><RequireOrgMember><RegistrationsPage /></RequireOrgMember></RequireAuth>} />

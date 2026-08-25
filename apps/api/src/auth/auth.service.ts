@@ -105,6 +105,7 @@ function toSessionUser(user: {
   isFellowshipLeader: boolean;
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
+  isDevotionalEditor: boolean;
 }): SessionUser {
   return {
     id: user.id,
@@ -117,5 +118,6 @@ function toSessionUser(user: {
     isFellowshipLeader: user.isFellowshipLeader,
     isPastor: user.isPastor,
     isFellowshipsDepartmentHead: user.isFellowshipsDepartmentHead,
+    isDevotionalEditor: user.isDevotionalEditor,
   };
 }

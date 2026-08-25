@@ -23,5 +23,9 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsBoolean()
+  isDevotionalEditor?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

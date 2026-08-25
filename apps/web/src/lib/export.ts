@@ -130,3 +130,15 @@ export function exportAttendanceToPdf(
   addBrandedFooter(doc);
   doc.save(`${sessionName.replace(/[^a-z0-9]+/gi, "-")}-attendance.pdf`);
 }
+
+/** Generic export for any Analytics report card -- takes whatever row
+ * shape that card already has on screen (Aug 2026: "there should be
+ * abilities to export all the reports"), so every report gets a download
+ * without a bespoke column mapper per report. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function exportRowsToExcel(rows: any[], filename: string) {
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, `${filename.replace(/[^a-z0-9]+/gi, "-")}.xlsx`);
+}

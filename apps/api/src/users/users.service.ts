@@ -18,6 +18,7 @@ const USER_SELECT = {
   isFellowshipLeader: true,
   isPastor: true,
   isFellowshipsDepartmentHead: true,
+  isDevotionalEditor: true,
   avatarAssetId: true,
   createdAt: true,
 } as const;

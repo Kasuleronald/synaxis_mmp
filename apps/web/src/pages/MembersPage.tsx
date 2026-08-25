@@ -7,6 +7,8 @@ import {
   LeadershipRole,
   MaritalStatus,
   MemberStatus,
+  WorkingStatus,
+  WORKING_STATUS_LABELS,
   type DiscipleshipClassDto,
   type FellowshipDto,
   type HouseholdDto,
@@ -113,6 +115,7 @@ export function MembersPage() {
   const [birthDay, setBirthDay] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus | "">("");
+  const [workingStatus, setWorkingStatus] = useState<WorkingStatus | "">("");
   const [isStudent, setIsStudent] = useState(false);
   const [school, setSchool] = useState("");
   const [leadershipRoles, setLeadershipRoles] = useState<LeadershipRole[]>([]);
@@ -284,6 +287,7 @@ export function MembersPage() {
       birthDay: birthDay ? Number(birthDay) : null,
       birthYear: birthYear ? Number(birthYear) : null,
       maritalStatus: maritalStatus || null,
+      workingStatus: workingStatus || null,
       isStudent,
       school: isStudent ? school || null : null,
       phone: phone || null,
@@ -310,6 +314,7 @@ export function MembersPage() {
       birthDay: birthDay ? Number(birthDay) : undefined,
       birthYear: birthYear ? Number(birthYear) : undefined,
       maritalStatus: maritalStatus || undefined,
+      workingStatus: workingStatus || undefined,
       isStudent,
       school: isStudent ? school || undefined : undefined,
       leadershipRoles,
@@ -605,6 +610,22 @@ export function MembersPage() {
             >
               <option value="">Not set</option>
               {Object.entries(MARITAL_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Working status</label>
+            <select
+              value={workingStatus}
+              onChange={(e) => setWorkingStatus(e.target.value as WorkingStatus | "")}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            >
+              <option value="">Not set</option>
+              {Object.entries(WORKING_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>

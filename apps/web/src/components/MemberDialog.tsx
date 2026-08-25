@@ -8,6 +8,8 @@ import {
   LeadershipRole,
   MaritalStatus,
   MemberStatus,
+  WorkingStatus,
+  WORKING_STATUS_LABELS,
   type FellowshipDto,
   type HouseholdDto,
   type MemberDto,
@@ -124,6 +126,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
   const [birthDay, setBirthDay] = useState(initial.birthDay?.toString() ?? "");
   const [birthYear, setBirthYear] = useState(initial.birthYear?.toString() ?? "");
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus | "">(initial.maritalStatus ?? "");
+  const [workingStatus, setWorkingStatus] = useState<WorkingStatus | "">(initial.workingStatus ?? "");
   const [isStudent, setIsStudent] = useState(initial.isStudent ?? false);
   const [school, setSchool] = useState(initial.school ?? "");
   const [status, setStatus] = useState<MemberStatus>(initial.status);
@@ -173,6 +176,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
       birthDay: birthDay ? Number(birthDay) : undefined,
       birthYear: birthYear ? Number(birthYear) : undefined,
       maritalStatus: maritalStatus || undefined,
+      workingStatus: workingStatus || undefined,
       isStudent,
       school: isStudent ? school || undefined : undefined,
       status,
@@ -306,6 +310,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
                 }
               />
               <Field label="Marital status" value={member.maritalStatus ? MARITAL_LABELS[member.maritalStatus] : null} />
+              <Field label="Working status" value={member.workingStatus ? WORKING_STATUS_LABELS[member.workingStatus] : null} />
               <Field label="Student" value={member.isStudent ? member.school || "Yes" : null} />
               <Field label="Status" value={STATUS_LABELS[member.status]} />
               <Field
@@ -396,6 +401,15 @@ export function MemberDialog({ member: initial, members, households, fellowships
                 <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value as MaritalStatus | "")} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }}>
                   <option value="">Not set</option>
                   {Object.entries(MARITAL_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Working status</label>
+                <select value={workingStatus} onChange={(e) => setWorkingStatus(e.target.value as WorkingStatus | "")} className="w-full rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }}>
+                  <option value="">Not set</option>
+                  {Object.entries(WORKING_STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </select>

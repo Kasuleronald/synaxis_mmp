@@ -10,7 +10,7 @@ import {
   Max,
   Min,
 } from "class-validator";
-import { Gender, HouseholdRole, LeadershipRole, MaritalStatus, MemberStatus } from "@life-mmp/shared";
+import { Gender, HouseholdRole, LeadershipRole, MaritalStatus, MemberStatus, WorkingStatus } from "@life-mmp/shared";
 
 export class UpdateMemberDto {
   @IsOptional()
@@ -69,6 +69,10 @@ export class UpdateMemberDto {
   @IsOptional()
   @IsEnum(MaritalStatus)
   maritalStatus?: MaritalStatus;
+
+  @IsOptional()
+  @IsEnum(WorkingStatus)
+  workingStatus?: WorkingStatus;
 
   @IsOptional()
   @IsBoolean()

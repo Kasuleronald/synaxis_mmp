@@ -53,6 +53,7 @@ export interface OrganizationDto {
   householdTerm: string | null;
   fellowshipTerm: string | null;
   departmentTerm: string | null;
+  devotionalTerm: string | null;
   // Display-only currency toggle for finance screens (never touches stored
   // amounts/currency, not historical-rate-aware -- an accepted tradeoff).
   secondaryCurrency: string | null;
@@ -73,6 +74,7 @@ export interface UpdateOrganizationInput {
   householdTerm?: string;
   fellowshipTerm?: string;
   departmentTerm?: string;
+  devotionalTerm?: string;
   secondaryCurrency?: string | null;
   secondaryCurrencyRate?: number | null;
 }
@@ -180,6 +182,7 @@ export interface UserDto {
   isFellowshipLeader: boolean;
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
+  isDevotionalEditor: boolean;
   avatarAssetId: string | null;
 }
 
@@ -194,6 +197,7 @@ export interface SessionUser {
   isFellowshipLeader: boolean;
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
+  isDevotionalEditor: boolean;
 }
 
 // --- Sprint 2: People -------------------------------------------------
@@ -228,6 +232,53 @@ export const MaritalStatus = {
   WIDOWED: "WIDOWED",
 } as const;
 export type MaritalStatus = (typeof MaritalStatus)[keyof typeof MaritalStatus];
+
+// Aug 2026 "soul winning" pipeline: a person won in evangelism is tracked
+// through these stages until fully integrated -- see SoulWinningRecordDto.
+export const SoulWinningStage = {
+  WON: "WON",
+  ATTENDING_PROGRAMS: "ATTENDING_PROGRAMS",
+  VISITED: "VISITED",
+  ALLOCATED_TO_FELLOWSHIP: "ALLOCATED_TO_FELLOWSHIP",
+  ENROLLED_NEW_BELIEVERS_CLASS: "ENROLLED_NEW_BELIEVERS_CLASS",
+  COMPLETED_NEW_BELIEVERS_CLASS: "COMPLETED_NEW_BELIEVERS_CLASS",
+} as const;
+export type SoulWinningStage = (typeof SoulWinningStage)[keyof typeof SoulWinningStage];
+
+export const SOUL_WINNING_STAGE_LABELS: Record<SoulWinningStage, string> = {
+  WON: "Won",
+  ATTENDING_PROGRAMS: "Attending church programs",
+  VISITED: "Being visited",
+  ALLOCATED_TO_FELLOWSHIP: "Allocated to a fellowship/cell",
+  ENROLLED_NEW_BELIEVERS_CLASS: "Enrolled in new believers class",
+  COMPLETED_NEW_BELIEVERS_CLASS: "Completed new believers class",
+};
+
+// The order stages are meant to progress through -- drives "next stage"
+// actions in the UI rather than a free jump to any value.
+export const SOUL_WINNING_STAGE_ORDER: SoulWinningStage[] = [
+  "WON",
+  "ATTENDING_PROGRAMS",
+  "VISITED",
+  "ALLOCATED_TO_FELLOWSHIP",
+  "ENROLLED_NEW_BELIEVERS_CLASS",
+  "COMPLETED_NEW_BELIEVERS_CLASS",
+];
+
+export const WorkingStatus = {
+  EMPLOYED: "EMPLOYED",
+  SELF_EMPLOYED: "SELF_EMPLOYED",
+  UNEMPLOYED: "UNEMPLOYED",
+  STUDYING: "STUDYING",
+} as const;
+export type WorkingStatus = (typeof WorkingStatus)[keyof typeof WorkingStatus];
+
+export const WORKING_STATUS_LABELS: Record<WorkingStatus, string> = {
+  EMPLOYED: "Employed",
+  SELF_EMPLOYED: "Self-employed",
+  UNEMPLOYED: "Unemployed",
+  STUDYING: "Still studying",
+};
 
 export const FollowUpStatus = {
   PENDING: "PENDING",
@@ -300,6 +351,7 @@ export interface MemberDto {
   birthDay: number | null;
   birthYear: number | null;
   maritalStatus: MaritalStatus | null;
+  workingStatus: WorkingStatus | null;
   isStudent: boolean | null;
   school: string | null;
   phone: string | null;
@@ -330,6 +382,7 @@ export interface CreateMemberInput {
   birthDay?: number;
   birthYear?: number;
   maritalStatus?: MaritalStatus;
+  workingStatus?: WorkingStatus;
   isStudent?: boolean;
   school?: string;
   phone?: string;
@@ -384,6 +437,9 @@ export interface EventDto {
   startsAt: string;
   endsAt: string | null;
   debrief?: { id: string } | null;
+  // The auto-created attendance session behind this event's public
+  // registration link (/checkin/:qrToken) -- always present once created.
+  attendanceSessions?: { id: string; qrToken: string }[];
 }
 
 export interface CreateEventInput {
@@ -1429,4 +1485,113 @@ export interface TestimonyDto {
 export interface CreateTestimonyInput {
   category: TestimonyCategory;
   content: string;
+}
+
+// --- Daily Devotional (Aug 2026) ----------------------------------------
+
+export interface DevotionalDto {
+  id: string;
+  organizationId: string;
+  date: string;
+  title: string;
+  scripture: string | null;
+  body: string;
+  authorId: string | null;
+  author?: { id: string; fullName: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertDevotionalInput {
+  date: string;
+  title: string;
+  scripture?: string;
+  body: string;
+}
+
+// --- Soul Winning (Aug 2026) ---------------------------------------------
+
+export interface SoulWinningStageChangeDto {
+  id: string;
+  stage: SoulWinningStage;
+  note: string | null;
+  changedAt: string;
+}
+
+export interface SoulWinningRecordDto {
+  id: string;
+  organizationId: string;
+  branchId: string | null;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  wonAt: string;
+  wonWhere: string | null;
+  stage: SoulWinningStage;
+  assignedToId: string | null;
+  assignedTo?: { id: string; fullName: string } | null;
+  fellowshipId: string | null;
+  fellowship?: { id: string; name: string } | null;
+  classId: string | null;
+  class?: { id: string; name: string } | null;
+  memberId: string | null;
+  member?: { id: string; fullName: string } | null;
+  notes: string | null;
+  stageHistory: SoulWinningStageChangeDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSoulWinningRecordInput {
+  branchId?: string;
+  fullName: string;
+  phone?: string;
+  address?: string;
+  wonAt?: string;
+  wonWhere?: string;
+  assignedToId?: string;
+  notes?: string;
+}
+
+export interface AdvanceSoulWinningStageInput {
+  stage: SoulWinningStage;
+  note?: string;
+  fellowshipId?: string;
+  classId?: string;
+}
+
+// --- Service Units (Aug 2026) ---------------------------------------------
+
+export interface ServiceUnitDto {
+  id: string;
+  organizationId: string;
+  branchId: string | null;
+  name: string;
+  description: string | null;
+  leaderId: string | null;
+  leader?: { id: string; fullName: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { members: number };
+  members?: { id: string; memberId: string; joinedAt: string; member: { id: string; fullName: string; phone: string | null } }[];
+}
+
+export interface CreateServiceUnitInput {
+  branchId?: string;
+  name: string;
+  description?: string;
+  leaderId?: string;
+}
+
+export interface ServiceUnitAttendanceDto {
+  unit: { id: string; name: string };
+  sessionCount: number;
+  members: {
+    memberId: string;
+    fullName: string;
+    totalSessions: number;
+    attended: number;
+    absent: number;
+    rate: number | null;
+  }[];
 }

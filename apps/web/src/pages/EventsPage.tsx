@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import type { EventDebriefDto, EventDto } from "@life-mmp/shared";
 import { api } from "../lib/api";
 
@@ -84,9 +85,10 @@ export function EventsPage() {
     <div className="max-w-2xl">
       <h1 className="text-xl font-semibold mb-1">Events</h1>
       <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
-        Services, classes, and gatherings -- create one here, then start an attendance session against it.
-        Once an event has happened, file a debrief: venue, actual attendance, strengths, challenges,
-        recommendations.
+        Services, classes, and gatherings -- creating one here also creates its public attendance
+        registration link automatically, so people can check themselves in and you can track and plan
+        around real numbers. Once an event has happened, file a debrief: venue, actual attendance,
+        strengths, challenges, recommendations.
       </p>
 
       <form
@@ -154,7 +156,17 @@ export function EventsPage() {
                     {e.location ? ` · ${e.location}` : ""}
                   </div>
                 </div>
-                {isPast && (
+                <div className="flex items-center gap-3 shrink-0">
+                  {e.attendanceSessions?.[0] && (
+                    <Link
+                      to={`/attendance/${e.attendanceSessions[0].id}`}
+                      className="text-xs underline"
+                      style={{ color: "var(--accent-ink)" }}
+                    >
+                      Attendance link
+                    </Link>
+                  )}
+                  {isPast && (
                   e.debrief ? (
                     <button
                       type="button"
@@ -174,7 +186,8 @@ export function EventsPage() {
                       File debrief
                     </button>
                   )
-                )}
+                  )}
+                </div>
               </div>
 
               {debriefingId === e.id && (
