@@ -178,6 +178,8 @@ export interface UserDto {
   isDeletionApprover: boolean;
   isRegistrationApprover: boolean;
   isFellowshipLeader: boolean;
+  isPastor: boolean;
+  isFellowshipsDepartmentHead: boolean;
   avatarAssetId: string | null;
 }
 
@@ -190,6 +192,8 @@ export interface SessionUser {
   branchId: string | null;
   avatarAssetId: string | null;
   isFellowshipLeader: boolean;
+  isPastor: boolean;
+  isFellowshipsDepartmentHead: boolean;
 }
 
 // --- Sprint 2: People -------------------------------------------------

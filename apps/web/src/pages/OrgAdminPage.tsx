@@ -103,6 +103,18 @@ export function OrgAdminPage() {
     setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
   }
 
+  async function onTogglePastorGrant(u: UserDto) {
+    const updated = await api.patch<UserDto>(`/users/${u.id}`, { isPastor: !u.isPastor });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+  }
+
+  async function onToggleFellowshipsDepartmentHeadGrant(u: UserDto) {
+    const updated = await api.patch<UserDto>(`/users/${u.id}`, {
+      isFellowshipsDepartmentHead: !u.isFellowshipsDepartmentHead,
+    });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+  }
+
   async function onInviteUser(e: FormEvent) {
     e.preventDefault();
     setUserError(null);
@@ -391,6 +403,32 @@ export function OrgAdminPage() {
                         {u.isFellowshipLeader ? "Can lead a cell ✓" : "Grant cell leadership"}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => onTogglePastorGrant(u)}
+                      title="Receives every fellowship report submitted, alongside the Org Admin and the Fellowships department head"
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={
+                        u.isPastor
+                          ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                          : { background: "var(--surface-2)", color: "var(--ink-muted)" }
+                      }
+                    >
+                      {u.isPastor ? "Pastor ✓" : "Make Pastor"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleFellowshipsDepartmentHeadGrant(u)}
+                      title="The one person all fellowship/cell leaders report to -- receives every fellowship report submitted"
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={
+                        u.isFellowshipsDepartmentHead
+                          ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                          : { background: "var(--surface-2)", color: "var(--ink-muted)" }
+                      }
+                    >
+                      {u.isFellowshipsDepartmentHead ? "Fellowships dept. head ✓" : "Make Fellowships dept. head"}
+                    </button>
                   </>
                 )}
               </div>

@@ -34,13 +34,11 @@ export class FellowshipReportsController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
-    return this.reports.list(tenantContextFor(user), { id: user.id, role: user.role }, {
-      refNumber,
-      fellowshipId,
-      financeStatus,
-      from,
-      to,
-    });
+    return this.reports.list(
+      tenantContextFor(user),
+      { id: user.id, role: user.role, isPastor: user.isPastor, isFellowshipsDepartmentHead: user.isFellowshipsDepartmentHead },
+      { refNumber, fellowshipId, financeStatus, from, to },
+    );
   }
 
   @Post(":id/approve")

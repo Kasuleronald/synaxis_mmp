@@ -165,6 +165,13 @@ model User {
   // whose base Role isn't FELLOWSHIP_LEADER (e.g. a Department Head who also
   // happens to run a cell group) without changing their role entirely.
   isFellowshipLeader Boolean @default(false)
+  // Same appointment model again -- a fellowship report's "general" reviewer
+  // list (Aug 2026: "goes to the admin, Pastors, and the Fellowships
+  // department head") is ORG_ADMIN plus whoever holds these two grants, not
+  // a Role, since most Pastors and the one Fellowships department head are
+  // ordinary staff logins, not a distinct system role.
+  isPastor Boolean @default(false)
+  isFellowshipsDepartmentHead Boolean @default(false)
   // Set when a Platform Admin generates a reset link for an org's admin
   // (no email sending yet -- Section: "no forgot password option"). Single
   // active token, cleared once used or replaced by a newer request.

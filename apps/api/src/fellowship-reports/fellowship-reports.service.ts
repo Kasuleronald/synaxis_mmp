@@ -79,15 +79,39 @@ export class FellowshipReportsService {
         include: REPORT_INCLUDE,
       });
 
+      // Every report goes to the org's general reviewer list -- the admin,
+      // whoever's appointed Pastor, and the Fellowships department head
+      // (Aug 2026: leaders "report to" that department) -- regardless of
+      // whether it carries a giving figure.
+      const generalReviewers = await tx.user.findMany({
+        where: {
+          organizationId: ctx.organizationId as string,
+          OR: [{ role: Role.ORG_ADMIN }, { isPastor: true }, { isFellowshipsDepartmentHead: true }],
+        },
+        select: { id: true },
+      });
+      await this.notifications.notifyWithinTx(
+        tx,
+        report.organizationId,
+        generalReviewers.map((r) => r.id),
+        "FELLOWSHIP_REPORT_SUBMITTED",
+        `${report.submittedBy?.fullName ?? "Someone"} submitted a report for "${fellowship.name}".`,
+        "/fellowships/reports",
+      );
+
       if (dto.givingAmount) {
-        const reviewers = await tx.user.findMany({
-          where: { organizationId: ctx.organizationId as string, role: { in: FINANCE_ROLES } },
+        // Finance Officers aren't necessarily Pastors/department heads, so
+        // they need their own notice when there's money to review -- Org
+        // Admins already got the general one above, so they're excluded
+        // here to avoid notifying them twice for the same report.
+        const financeReviewers = await tx.user.findMany({
+          where: { organizationId: ctx.organizationId as string, role: Role.FINANCE_OFFICER },
           select: { id: true },
         });
         await this.notifications.notifyWithinTx(
           tx,
           report.organizationId,
-          reviewers.map((r) => r.id),
+          financeReviewers.map((r) => r.id),
           "FELLOWSHIP_REPORT_SUBMITTED",
           `${report.submittedBy?.fullName ?? "Someone"} submitted a report for "${fellowship.name}" with giving to review.`,
           "/fellowships/reports",
@@ -105,10 +129,13 @@ export class FellowshipReportsService {
    * and the "find this report by ref/date/fellowship/status" search. */
   async list(
     ctx: TenantContext,
-    requestingUser: { id: string; role: Role },
+    requestingUser: { id: string; role: Role; isPastor?: boolean; isFellowshipsDepartmentHead?: boolean },
     filters?: { refNumber?: string; fellowshipId?: string; financeStatus?: string; from?: string; to?: string },
   ) {
-    const seesAll = FINANCE_ROLES.includes(requestingUser.role);
+    const seesAll =
+      FINANCE_ROLES.includes(requestingUser.role) ||
+      requestingUser.isPastor ||
+      requestingUser.isFellowshipsDepartmentHead;
     return runWithTenant(this.prisma, ctx, (tx) =>
       tx.fellowshipReport.findMany({
         where: {

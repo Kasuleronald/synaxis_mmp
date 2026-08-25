@@ -15,5 +15,13 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsBoolean()
+  isPastor?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isFellowshipsDepartmentHead?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

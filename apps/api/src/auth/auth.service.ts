@@ -103,6 +103,8 @@ function toSessionUser(user: {
   branchId: string | null;
   avatarAssetId: string | null;
   isFellowshipLeader: boolean;
+  isPastor: boolean;
+  isFellowshipsDepartmentHead: boolean;
 }): SessionUser {
   return {
     id: user.id,
@@ -113,5 +115,7 @@ function toSessionUser(user: {
     branchId: user.branchId,
     avatarAssetId: user.avatarAssetId,
     isFellowshipLeader: user.isFellowshipLeader,
+    isPastor: user.isPastor,
+    isFellowshipsDepartmentHead: user.isFellowshipsDepartmentHead,
   };
 }
