@@ -35,12 +35,15 @@ function confidenceColor(c: number | null): string {
   return "var(--danger)";
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function ImportBatchPage() {
   const { id } = useParams<{ id: string }>();
   const [batch, setBatch] = useState<BatchWithRows | null>(null);
   const [committing, setCommitting] = useState(false);
   const [summary, setSummary] = useState<{ committed: number; skipped: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showIssues, setShowIssues] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -51,6 +54,23 @@ export function ImportBatchPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const duplicateRows =
+    batch?.rows.filter((r) => (r.possibleDuplicateOfId || r.duplicateOfRowIndex !== null) && r.status === ImportRowStatus.PENDING) ?? [];
+  const badDateRows =
+    batch?.rows.filter((r) => {
+      const dob = r.extractedFields.dateOfBirth;
+      return !!dob && !ISO_DATE_RE.test(dob) && r.status === ImportRowStatus.PENDING;
+    }) ?? [];
+  const hasIssues = duplicateRows.length > 0 || badDateRows.length > 0 || (batch?.skippedRowCount ?? 0) > 0;
+
+  // Pops up once per batch, the moment its rows first load, so a user
+  // reviewing an import sees "here's what needs a decision" before diving
+  // into the row-by-row table -- reopenable afterward via the button below.
+  useEffect(() => {
+    if (batch && batch.status !== ImportStatus.COMMITTED && hasIssues) setShowIssues(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batch?.id]);
 
   async function updateRow(rowId: string, patch: Partial<ImportStagingRowDto>) {
     // Functional update, not a closure over `batch` -- bulk actions call
@@ -94,6 +114,11 @@ export function ImportBatchPage() {
   async function skipSelected() {
     await Promise.all([...selectedIds].map((rowId) => updateRow(rowId, { status: ImportRowStatus.REJECTED })));
     setSelectedIds(new Set());
+  }
+
+  async function skipAllDuplicates() {
+    await Promise.all(duplicateRows.map((r) => updateRow(r.id, { status: ImportRowStatus.REJECTED })));
+    setShowIssues(false);
   }
 
   async function onCommit() {
@@ -148,6 +173,16 @@ export function ImportBatchPage() {
           >
             Approve all
           </button>
+          {hasIssues && (
+            <button
+              type="button"
+              onClick={() => setShowIssues(true)}
+              className="rounded-md px-3 py-1.5 text-sm font-medium"
+              style={{ background: "var(--warn-soft)", color: "var(--warn)" }}
+            >
+              Review issues ({duplicateRows.length + badDateRows.length})
+            </button>
+          )}
           {selectedIds.size > 0 && (
             <>
               <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
@@ -418,6 +453,77 @@ export function ImportBatchPage() {
           </tbody>
         </table>
       </div>
+
+      {showIssues && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="w-full max-w-lg rounded-xl border p-5 grid gap-4" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+            <div>
+              <h2 className="text-base font-semibold">Before you approve anything</h2>
+              <p className="text-sm mt-1" style={{ color: "var(--ink-muted)" }}>
+                A few things in this file are worth a look first.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {batch.skippedRowCount > 0 && (
+                <div className="rounded-md border p-3 text-sm" style={{ borderColor: "var(--line-soft)" }}>
+                  <strong>{batch.skippedRowCount}</strong> row{batch.skippedRowCount === 1 ? "" : "s"} from the
+                  file had no name and {batch.skippedRowCount === 1 ? "wasn't" : "weren't"} imported at all --
+                  check the original spreadsheet for blank cells or extra header/divider rows.
+                </div>
+              )}
+
+              {duplicateRows.length > 0 && (
+                <div className="rounded-md border p-3 text-sm" style={{ borderColor: "var(--line-soft)" }}>
+                  <p className="mb-2">
+                    <strong>{duplicateRows.length}</strong> possible duplicate{duplicateRows.length === 1 ? "" : "s"} --{" "}
+                    {duplicateRows.length === 1 ? "this looks" : "these look"} like the same person as someone
+                    else in this file, or someone already in your directory.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={skipAllDuplicates}
+                      className="rounded-md px-3 py-1.5 text-xs font-medium"
+                      style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+                    >
+                      Skip all {duplicateRows.length} flagged duplicates
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowIssues(false)}
+                      className="rounded-md px-3 py-1.5 text-xs font-medium"
+                      style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+                    >
+                      I'll check each one myself
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {badDateRows.length > 0 && (
+                <div className="rounded-md border p-3 text-sm" style={{ borderColor: "var(--line-soft)" }}>
+                  <strong>{badDateRows.length}</strong> date of birth{badDateRows.length === 1 ? "" : "s"}{" "}
+                  couldn't be read confidently and {badDateRows.length === 1 ? "is" : "are"} shown exactly as
+                  typed in the file -- fix {badDateRows.length === 1 ? "it" : "them"} in the Date of birth
+                  column below before approving {badDateRows.length === 1 ? "that row" : "those rows"}.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowIssues(false)}
+                className="rounded-md px-3 py-1.5 text-sm font-medium"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                Review below
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
