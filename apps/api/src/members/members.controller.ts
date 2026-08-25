@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@ne
 import type { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { tenantContextFor } from "../auth/tenant-context";
+import { branchScopeFor, tenantContextFor } from "../auth/tenant-context";
 import { CreateMemberDto } from "./dto/create-member.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 import { MembersService } from "./members.service";
@@ -19,7 +19,7 @@ export class MembersController {
 
   @Get()
   list(@CurrentUser() user: SessionUser, @Query("q") q?: string) {
-    return this.members.list(tenantContextFor(user), q);
+    return this.members.list(tenantContextFor(user), q, branchScopeFor(user));
   }
 
   @Get(":id")

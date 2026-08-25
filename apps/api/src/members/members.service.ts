@@ -117,17 +117,20 @@ export class MembersService {
     return tx.member.update({ where: { id: memberId }, data: { householdId, householdRole: "SPOUSE" } });
   }
 
-  async list(ctx: TenantContext, search?: string) {
+  async list(ctx: TenantContext, search?: string, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, (tx) =>
       tx.member.findMany({
-        where: search
-          ? {
-              OR: [
-                { fullName: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search, mode: "insensitive" } },
-              ],
-            }
-          : undefined,
+        where: {
+          branchId,
+          ...(search
+            ? {
+                OR: [
+                  { fullName: { contains: search, mode: "insensitive" } },
+                  { phone: { contains: search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
         orderBy: { fullName: "asc" },
         take: 100,
         include: {

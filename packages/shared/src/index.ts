@@ -1044,6 +1044,21 @@ export interface FundStatementDto {
   total: number;
 }
 
+export interface MemberAttendanceLineDto {
+  sessionId: string;
+  sessionName: string;
+  sessionDate: string;
+  checkedInAt: string;
+}
+
+export interface MemberAttendanceDto {
+  member: { id: string; fullName: string } | null;
+  lines: MemberAttendanceLineDto[];
+  totalCheckIns: number;
+  firstCheckIn: string | null;
+  lastCheckIn: string | null;
+}
+
 export interface FellowshipLeaderboardEntryDto {
   leaderId: string;
   leaderName: string;

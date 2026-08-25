@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { MemberDto } from "@life-mmp/shared";
+import type { AttendanceRecordDto, MemberDto } from "@life-mmp/shared";
 
 const FOOTER_TEXT = "Extracted from Synaxis - Ministry Management Platform";
 
@@ -90,4 +90,43 @@ export function exportMembersToPdf(members: MemberDto[], orgName: string, logoDa
 
   addBrandedFooter(doc);
   doc.save(`${orgName.replace(/[^a-z0-9]+/gi, "-")}-members.pdf`);
+}
+
+function attendanceRows(records: AttendanceRecordDto[]) {
+  return records.map((r) => ({
+    Name: r.member?.fullName ?? r.visitorName ?? "",
+    Phone: r.member?.phone ?? r.visitorPhone ?? "",
+    Type: r.memberId ? "Member" : "Walk-in",
+    "Checked in at": new Date(r.checkedInAt).toLocaleString(),
+  }));
+}
+
+export function exportAttendanceToExcel(records: AttendanceRecordDto[], orgName: string, sessionName: string) {
+  const rows = attendanceRows(records);
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+  XLSX.writeFile(wb, `${sessionName.replace(/[^a-z0-9]+/gi, "-")}-attendance.xlsx`);
+}
+
+export function exportAttendanceToPdf(
+  records: AttendanceRecordDto[],
+  orgName: string,
+  sessionName: string,
+  logoDataUri?: string | null,
+) {
+  const doc = new jsPDF();
+  addBrandedHeader(doc, orgName, sessionName, logoDataUri);
+
+  const rows = attendanceRows(records);
+  autoTable(doc, {
+    startY: 26,
+    head: [Object.keys(rows[0] ?? { Name: "" })],
+    body: rows.map((r) => Object.values(r)),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [27, 122, 87] },
+  });
+
+  addBrandedFooter(doc);
+  doc.save(`${sessionName.replace(/[^a-z0-9]+/gi, "-")}-attendance.pdf`);
 }

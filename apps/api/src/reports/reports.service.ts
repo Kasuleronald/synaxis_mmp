@@ -25,15 +25,24 @@ export class ReportsService {
 
   /** New members per month, plus a running cumulative total -- the
    * cumulative side is computed here rather than in SQL so the frontend
-   * never has to reconcile two different rounding/timezone behaviors. */
-  async membersOverTime(ctx: TenantContext) {
+   * never has to reconcile two different rounding/timezone behaviors.
+   * `branchId` is `undefined` for an all-branches viewer, `null` for a
+   * branch-scoped viewer with no branch assigned, or a specific branch. */
+  async membersOverTime(ctx: TenantContext, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, async (tx) => {
-      const rows = await tx.$queryRaw<{ month: Date; count: bigint }[]>`
-        SELECT date_trunc('month', COALESCE("joinedAt", "createdAt")) AS month, COUNT(*) AS count
-        FROM members
-        GROUP BY month
-        ORDER BY month
-      `;
+      const rows =
+        branchId !== undefined
+          ? await tx.$queryRaw<{ month: Date; count: bigint }[]>`
+              SELECT date_trunc('month', COALESCE("joinedAt", "createdAt")) AS month, COUNT(*) AS count
+              FROM members WHERE "branchId" IS NOT DISTINCT FROM ${branchId}
+              GROUP BY month ORDER BY month
+            `
+          : await tx.$queryRaw<{ month: Date; count: bigint }[]>`
+              SELECT date_trunc('month', COALESCE("joinedAt", "createdAt")) AS month, COUNT(*) AS count
+              FROM members
+              GROUP BY month
+              ORDER BY month
+            `;
       let cumulative = 0;
       return rows.map((r) => {
         cumulative += Number(r.count);
@@ -42,9 +51,10 @@ export class ReportsService {
     });
   }
 
-  async demographics(ctx: TenantContext) {
+  async demographics(ctx: TenantContext, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, async (tx) => {
       const members = await tx.member.findMany({
+        where: { branchId },
         select: { gender: true, maritalStatus: true, status: true, birthYear: true },
       });
       const count = (arr: (string | null)[]) => {
@@ -65,18 +75,22 @@ export class ReportsService {
     });
   }
 
-  async attendanceTrend(ctx: TenantContext, groupBy?: string) {
+  async attendanceTrend(ctx: TenantContext, groupBy?: string, branchId?: string | null) {
     const bucket = normalizeBucket(groupBy);
     return runWithTenant(this.prisma, ctx, async (tx) => {
+      // attendance_records has no branchId of its own -- only reachable via
+      // its session, so a branch scope means joining instead of a bare WHERE.
       const rows =
-        bucket === "week"
+        branchId !== undefined
           ? await tx.$queryRaw<{ period: Date; count: bigint }[]>`
-              SELECT date_trunc('week', "checkedInAt") AS period, COUNT(*) AS count
-              FROM attendance_records
+              SELECT date_trunc(${bucket}, ar."checkedInAt") AS period, COUNT(*) AS count
+              FROM attendance_records ar
+              JOIN attendance_sessions s ON s.id = ar."sessionId"
+              WHERE s."branchId" IS NOT DISTINCT FROM ${branchId}
               GROUP BY period ORDER BY period
             `
           : await tx.$queryRaw<{ period: Date; count: bigint }[]>`
-              SELECT date_trunc('month', "checkedInAt") AS period, COUNT(*) AS count
+              SELECT date_trunc(${bucket}, "checkedInAt") AS period, COUNT(*) AS count
               FROM attendance_records
               GROUP BY period ORDER BY period
             `;
@@ -84,18 +98,18 @@ export class ReportsService {
     });
   }
 
-  async givingTrend(ctx: TenantContext, groupBy?: string) {
+  async givingTrend(ctx: TenantContext, groupBy?: string, branchId?: string | null) {
     const bucket = normalizeBucket(groupBy);
     return runWithTenant(this.prisma, ctx, async (tx) => {
       const rows =
-        bucket === "week"
+        branchId !== undefined
           ? await tx.$queryRaw<{ period: Date; total: string }[]>`
-              SELECT date_trunc('week', "givenAt") AS period, SUM(amount) AS total
-              FROM giving_records
+              SELECT date_trunc(${bucket}, "givenAt") AS period, SUM(amount) AS total
+              FROM giving_records WHERE "branchId" IS NOT DISTINCT FROM ${branchId}
               GROUP BY period ORDER BY period
             `
           : await tx.$queryRaw<{ period: Date; total: string }[]>`
-              SELECT date_trunc('month', "givenAt") AS period, SUM(amount) AS total
+              SELECT date_trunc(${bucket}, "givenAt") AS period, SUM(amount) AS total
               FROM giving_records
               GROUP BY period ORDER BY period
             `;
@@ -103,9 +117,9 @@ export class ReportsService {
     });
   }
 
-  async givingByCategory(ctx: TenantContext) {
+  async givingByCategory(ctx: TenantContext, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, async (tx) => {
-      const rows = await tx.givingRecord.groupBy({ by: ["categoryId"], _sum: { amount: true } });
+      const rows = await tx.givingRecord.groupBy({ where: { branchId }, by: ["categoryId"], _sum: { amount: true } });
       const categories = await tx.givingCategory.findMany({ select: { id: true, name: true } });
       const nameOf = new Map(categories.map((c) => [c.id, c.name]));
       return rows
@@ -114,9 +128,9 @@ export class ReportsService {
     });
   }
 
-  async givingByFund(ctx: TenantContext) {
+  async givingByFund(ctx: TenantContext, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, async (tx) => {
-      const rows = await tx.givingRecord.groupBy({ by: ["fundId"], _sum: { amount: true } });
+      const rows = await tx.givingRecord.groupBy({ where: { branchId }, by: ["fundId"], _sum: { amount: true } });
       const funds = await tx.fund.findMany({ select: { id: true, name: true } });
       const nameOf = new Map(funds.map((f) => [f.id, f.name]));
       return rows
@@ -168,14 +182,46 @@ export class ReportsService {
     });
   }
 
+  /** One member's own check-in history across every session -- the
+   * "individual attendance analytics" view, same running-history idea as
+   * memberStatement/fundStatement but for attendance instead of giving. */
+  async memberAttendance(ctx: TenantContext, memberId: string) {
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const [member, records] = await Promise.all([
+        tx.member.findUnique({ where: { id: memberId }, select: { id: true, fullName: true } }),
+        tx.attendanceRecord.findMany({
+          where: { memberId },
+          include: { session: { select: { id: true, name: true, date: true } } },
+          orderBy: { checkedInAt: "desc" },
+        }),
+      ]);
+      const lines = records.map((r) => ({
+        sessionId: r.sessionId,
+        sessionName: r.session.name,
+        sessionDate: r.session.date,
+        checkedInAt: r.checkedInAt,
+      }));
+      return {
+        member,
+        lines,
+        totalCheckIns: lines.length,
+        firstCheckIn: lines.length ? lines[lines.length - 1].checkedInAt : null,
+        lastCheckIn: lines.length ? lines[0].checkedInAt : null,
+      };
+    });
+  }
+
   /** Per fellowship leader (the User who submitted the report, not
    * necessarily the Member tagged as the fellowship's ministry leader):
    * submission volume, average attendance, and how much of their reported
    * giving actually held up under finance review -- the closest thing to
    * "leader performance" this dataset supports today. */
-  async fellowshipLeaderboard(ctx: TenantContext) {
+  async fellowshipLeaderboard(ctx: TenantContext, branchId?: string | null) {
     return runWithTenant(this.prisma, ctx, async (tx) => {
       const reports = await tx.fellowshipReport.findMany({
+        // FellowshipReport has no branchId of its own -- only reachable via
+        // its fellowship's.
+        where: branchId !== undefined ? { fellowship: { branchId } } : undefined,
         include: { submittedBy: { select: { id: true, fullName: true } }, fellowship: { select: { id: true, name: true } } },
       });
       const byLeader = new Map<

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ASSET_CONDITION_LABELS,
   FIXED_ASSET_CATEGORY_LABELS,
+  type AttendanceRecordDto,
+  type AttendanceSessionDto,
   type AttendanceTrendPoint,
   type DemographicsReportDto,
   type FellowshipLeaderboardEntryDto,
@@ -11,6 +13,7 @@ import {
   type GivingCategoryTotal,
   type GivingFundTotal,
   type GivingTrendPoint,
+  type MemberAttendanceDto,
   type MemberDto,
   type MemberStatementDto,
   type MembersOverTimePoint,
@@ -18,6 +21,7 @@ import {
 } from "@life-mmp/shared";
 import { useOrg } from "../context/OrgContext";
 import { api } from "../lib/api";
+import { exportAttendanceToExcel, exportAttendanceToPdf } from "../lib/export";
 
 function formatMoney(amount: number | string, currency: string) {
   return `${currency} ${Number(amount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -49,6 +53,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 const TABS = [
   ["overview", "Members & attendance"],
+  ["attendance", "Attendance lists"],
   ["giving", "Giving"],
   ["statements", "Statements"],
   ["pledges", "Pledges"],
@@ -261,6 +266,122 @@ function StatementsTab({ currency }: { currency: string }) {
   );
 }
 
+function AttendanceListsTab() {
+  const { org } = useOrg();
+  const [sessions, setSessions] = useState<AttendanceSessionDto[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [members, setMembers] = useState<MemberDto[]>([]);
+  const [memberId, setMemberId] = useState("");
+  const [memberAttendance, setMemberAttendance] = useState<MemberAttendanceDto | null>(null);
+
+  useEffect(() => {
+    api.get<AttendanceSessionDto[]>("/attendance/sessions").then(setSessions);
+    api.get<MemberDto[]>("/members").then(setMembers);
+  }, []);
+
+  useEffect(() => {
+    if (!memberId) {
+      setMemberAttendance(null);
+      return;
+    }
+    api.get<MemberAttendanceDto>(`/reports/member-attendance/${memberId}`).then(setMemberAttendance);
+  }, [memberId]);
+
+  async function download(format: "excel" | "pdf") {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    setDownloading(true);
+    try {
+      const records = await api.get<AttendanceRecordDto[]>(`/attendance/sessions/${sessionId}/records`);
+      if (format === "excel") exportAttendanceToExcel(records, org?.displayName ?? "Synaxis MMP", session.name);
+      else exportAttendanceToPdf(records, org?.displayName ?? "Synaxis MMP", session.name, org?.logoUrl);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="Download an event's attendance list">
+        <select
+          value={sessionId}
+          onChange={(e) => setSessionId(e.target.value)}
+          className="w-full rounded-md border px-3 py-2 text-sm mb-3"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <option value="">Choose an event/session</option>
+          {sessions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} · {new Date(s.date).toLocaleDateString()}
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={!sessionId || downloading}
+            onClick={() => download("excel")}
+            className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+          >
+            Excel (.xlsx)
+          </button>
+          <button
+            type="button"
+            disabled={!sessionId || downloading}
+            onClick={() => download("pdf")}
+            className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+          >
+            PDF
+          </button>
+        </div>
+      </Card>
+      <Card title="Individual attendance">
+        <select
+          value={memberId}
+          onChange={(e) => setMemberId(e.target.value)}
+          className="w-full rounded-md border px-3 py-2 text-sm mb-3"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <option value="">Choose a member</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.fullName}
+            </option>
+          ))}
+        </select>
+        {memberAttendance && (
+          <>
+            <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>
+              {memberAttendance.totalCheckIns} check-in{memberAttendance.totalCheckIns === 1 ? "" : "s"}
+              {memberAttendance.firstCheckIn &&
+                ` · first ${new Date(memberAttendance.firstCheckIn).toLocaleDateString()} · last ${new Date(memberAttendance.lastCheckIn as string).toLocaleDateString()}`}
+            </p>
+            <div className="rounded-md border overflow-hidden max-h-72 overflow-y-auto" style={{ borderColor: "var(--line-soft)" }}>
+              {memberAttendance.lines.length === 0 ? (
+                <div className="p-3 text-xs" style={{ color: "var(--ink-muted)" }}>No check-ins on record for this member.</div>
+              ) : (
+                memberAttendance.lines.map((l, i) => (
+                  <div
+                    key={`${l.sessionId}-${i}`}
+                    className="flex items-center justify-between px-3 py-2 text-xs border-t first:border-t-0"
+                    style={{ borderColor: "var(--line-soft)" }}
+                  >
+                    <span>{l.sessionName}</span>
+                    <span style={{ color: "var(--ink-muted)" }}>{new Date(l.checkedInAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function PledgesTab({ currency }: { currency: string }) {
   const [pledges, setPledges] = useState<PledgeDto[]>([]);
   useEffect(() => {
@@ -397,6 +518,7 @@ export function ReportsPage() {
       </div>
 
       {tab === "overview" && <OverviewTab />}
+      {tab === "attendance" && <AttendanceListsTab />}
       {tab === "giving" && <GivingTab currency={currency} />}
       {tab === "statements" && <StatementsTab currency={currency} />}
       {tab === "pledges" && <PledgesTab currency={currency} />}
