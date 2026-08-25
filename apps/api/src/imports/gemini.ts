@@ -56,7 +56,7 @@ export async function extractMembersWithGemini(text: string): Promise<GeminiExtr
       "No Gemini API key configured -- add GEMINI_API_KEY to apps/api/.env to enable AI extraction.",
     );
   }
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const prompt = `You are extracting church membership records from a document. Read the text below (it may be a register, a list, or a table that didn't parse cleanly as a spreadsheet) and return every person you can find as a row. Only include fullName as required; leave other fields out if you can't determine them confidently, and set confidence per row accordingly.\n\n---\n${text.slice(0, 60_000)}`;
 
   const res = await fetch(
@@ -117,7 +117,7 @@ export async function normalizeDatesWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || dates.length === 0) return [];
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const listing = dates.map((d) => `${d.rowIndex}: "${d.raw}"`).join("\n");
   const prompt = `Each line below is a row number and a date of birth exactly as typed into a church membership spreadsheet, in an unclear or inconsistent format. Convert each to ISO 8601 (YYYY-MM-DD). These are birth dates -- infer the century sensibly for a 2-digit year and any other ambiguity (nobody here was born in the future or is over 110). If a value genuinely isn't a date or you can't determine it with reasonable confidence, leave that row number out of your response entirely rather than guessing. Do not invent row numbers -- only use the numbers given.\n\n${listing}`;
 
@@ -186,7 +186,7 @@ export async function findDuplicatesWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || rows.length < 2) return [];
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const listing = rows.map((r) => `${r.rowIndex}: ${r.fullName}${r.phone ? ` (${r.phone})` : ""}`).join("\n");
   const prompt = `Below is a numbered list of names (with phone numbers where known) extracted from one church membership spreadsheet. Some names may refer to the same real person written differently -- typos, missing/extra initials, reordered names, nicknames, or honorifics (Mr./Mrs./Pastor). Two rows sharing a phone number are almost certainly the same person even if the names differ more. Group only rows you're confident are the same person; a name that's merely similar to another (e.g. two different siblings/relatives) is NOT a duplicate. Do not invent row numbers -- only use the numbers given. If nothing looks like a duplicate, return an empty groups array.\n\n${listing}`;
 
