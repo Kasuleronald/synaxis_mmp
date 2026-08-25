@@ -5,7 +5,7 @@ import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { mapColumns } from "./column-mapper";
 import { parseSheet } from "./sheet-parser";
 import { extractPdfText } from "./pdf-text";
-import { extractMembersWithGemini, GeminiUnavailableError, type GeminiExtractedRow } from "./gemini";
+import { extractMembersWithGemini, findDuplicatesWithGemini, GeminiUnavailableError, type GeminiExtractedRow } from "./gemini";
 import { UpdateStagingRowDto } from "./dto/update-staging-row.dto";
 
 interface StagedCandidate {
@@ -132,9 +132,52 @@ export class ImportsService {
       throw new BadRequestException(`Unsupported file type: .${ext}`);
     }
 
+    const extractedCount = candidates.length;
     candidates = candidates.filter((c) => typeof c.extractedFields.fullName === "string" && c.extractedFields.fullName);
     if (candidates.length === 0) {
       throw new BadRequestException("Couldn't find any member records in this file.");
+    }
+    // Rows that came out of the sheet/AI pass but had no usable name --
+    // almost always a blank cell or a stray divider row. Surfaced on the
+    // batch (not silently dropped) so "why did fewer rows show up than I
+    // expected" has an actual answer.
+    const skippedRowCount = extractedCount - candidates.length;
+
+    // Within-batch duplicates -- the same person listed twice in the file
+    // itself, not against the existing directory. Exact normalized-name
+    // matches first (free, instant); an AI pass then catches the ones that
+    // slip past exact matching (typos, initials, reordered names) without
+    // re-flagging what's already caught deterministically.
+    const duplicateOfRowIndex: (number | null)[] = candidates.map(() => null);
+    const duplicateReason: (string | null)[] = candidates.map(() => null);
+    const firstIndexByName = new Map<string, number>();
+    candidates.forEach((c, i) => {
+      const name = normalizeName(String(c.extractedFields.fullName));
+      const firstIndex = firstIndexByName.get(name);
+      if (firstIndex === undefined) {
+        firstIndexByName.set(name, i);
+      } else {
+        duplicateOfRowIndex[i] = firstIndex;
+        duplicateReason[i] = "Same name as another row in this file";
+      }
+    });
+    try {
+      const unflagged = candidates
+        .map((c, i) => ({ rowIndex: i, fullName: String(c.extractedFields.fullName), phone: c.extractedFields.phone as string | undefined }))
+        .filter((r) => duplicateOfRowIndex[r.rowIndex] === null);
+      const groups = await findDuplicatesWithGemini(unflagged);
+      for (const g of groups) {
+        const [first, ...rest] = [...g.rowIndexes].sort((a, b) => a - b);
+        for (const idx of rest) {
+          if (duplicateOfRowIndex[idx] === null) {
+            duplicateOfRowIndex[idx] = first;
+            duplicateReason[idx] = g.reason;
+          }
+        }
+      }
+    } catch {
+      // Best-effort -- no API key, quota, or a transient failure should
+      // never block the import itself, only skip this extra pass.
     }
 
     return runWithTenant(this.prisma, ctx, async (tx) => {
@@ -145,6 +188,7 @@ export class ImportsService {
           targetEntity: "member",
           status: ImportStatus.READY_FOR_REVIEW,
           usedAi,
+          skippedRowCount,
         },
       });
 
@@ -177,6 +221,8 @@ export class ImportsService {
           confidence: c.confidence,
           source: c.source,
           possibleDuplicateOfId: existingByName.get(normalizeName(String(c.extractedFields.fullName))) ?? null,
+          duplicateOfRowIndex: duplicateOfRowIndex[i],
+          duplicateReason: duplicateReason[i],
         })),
       });
 

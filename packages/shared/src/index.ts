@@ -488,6 +488,7 @@ export interface ImportBatchDto {
   usedAi: boolean;
   createdAt: string;
   rowCount?: number;
+  skippedRowCount: number;
 }
 
 export interface ImportStagingRowDto {
@@ -509,6 +510,8 @@ export interface ImportStagingRowDto {
   confidence: number | null;
   source: "deterministic" | "ai";
   possibleDuplicateOfId: string | null;
+  duplicateOfRowIndex: number | null;
+  duplicateReason: string | null;
   status: ImportRowStatus;
 }
 

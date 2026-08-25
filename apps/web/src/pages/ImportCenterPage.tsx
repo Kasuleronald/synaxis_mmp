@@ -118,6 +118,9 @@ export function ImportCenterPage() {
               <div className="text-sm font-medium">{b.filename}</div>
               <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
                 {b.rowCount ?? 0} rows{b.usedAi ? " · AI-assisted" : ""}
+                {b.skippedRowCount > 0 && (
+                  <span style={{ color: "var(--warn)" }}> · {b.skippedRowCount} row{b.skippedRowCount === 1 ? "" : "s"} skipped (no name found)</span>
+                )}
               </div>
             </div>
             <span className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>

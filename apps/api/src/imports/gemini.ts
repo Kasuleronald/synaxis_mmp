@@ -83,3 +83,75 @@ export async function extractMembersWithGemini(text: string): Promise<GeminiExtr
   const parsed = JSON.parse(jsonText);
   return Array.isArray(parsed.rows) ? parsed.rows : [];
 }
+
+export interface DuplicateGroup {
+  /** rowIndex values (0-based, matching ImportStagingRow.rowIndex) of rows
+   * the model believes are the same person. */
+  rowIndexes: number[];
+  reason: string;
+}
+
+const DUPLICATES_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    groups: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rowIndexes: { type: "array", items: { type: "integer" } },
+          reason: { type: "string", description: "Short reason these rows look like the same person" },
+        },
+        required: ["rowIndexes", "reason"],
+      },
+    },
+  },
+  required: ["groups"],
+};
+
+/** Aug 2026: exact-name matching alone missed same-file duplicates spelled
+ * differently (typos, initials, reordered names, honorifics). This is a
+ * second pass over the same batch's candidate rows specifically for that --
+ * best-effort, never blocks a commit if it fails or isn't configured. */
+export async function findDuplicatesWithGemini(
+  rows: { rowIndex: number; fullName: string; phone?: string }[],
+): Promise<DuplicateGroup[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || rows.length < 2) return [];
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const listing = rows.map((r) => `${r.rowIndex}: ${r.fullName}${r.phone ? ` (${r.phone})` : ""}`).join("\n");
+  const prompt = `Below is a numbered list of names (with phone numbers where known) extracted from one church membership spreadsheet. Some names may refer to the same real person written differently -- typos, missing/extra initials, reordered names, nicknames, or honorifics (Mr./Mrs./Pastor). Two rows sharing a phone number are almost certainly the same person even if the names differ more. Group only rows you're confident are the same person; a name that's merely similar to another (e.g. two different siblings/relatives) is NOT a duplicate. Do not invent row numbers -- only use the numbers given. If nothing looks like a duplicate, return an empty groups array.\n\n${listing}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: DUPLICATES_RESPONSE_SCHEMA },
+      }),
+    },
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json().catch(() => null);
+  const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!jsonText) return [];
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    const validIndexes = new Set(rows.map((r) => r.rowIndex));
+    return Array.isArray(parsed.groups)
+      ? parsed.groups
+          .map((g: any) => ({
+            rowIndexes: Array.isArray(g.rowIndexes) ? g.rowIndexes.filter((i: unknown) => typeof i === "number" && validIndexes.has(i)) : [],
+            reason: typeof g.reason === "string" ? g.reason : "Likely the same person",
+          }))
+          .filter((g: DuplicateGroup) => g.rowIndexes.length >= 2)
+      : [];
+  } catch {
+    return [];
+  }
+}

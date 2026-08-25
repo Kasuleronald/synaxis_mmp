@@ -470,6 +470,11 @@ model ImportBatch {
   targetEntity   String // "member" for Sprint 3; more entities later
   status         ImportStatus @default(UPLOADED)
   usedAi         Boolean      @default(false)
+  // Rows the file actually had that never became a staging row -- almost
+  // always because no name could be determined for them (a blank cell, a
+  // stray section-divider row). Aug 2026: a 140-row file silently staging
+  // only 100 with zero indication why is the actual bug being fixed here.
+  skippedRowCount Int         @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -492,6 +497,13 @@ model ImportStagingRow {
   confidence     Float?
   source         String // "deterministic" | "ai"
   possibleDuplicateOfId String?
+  // Flags this row as a likely duplicate of an EARLIER row in the same
+  // batch (rowIndex, not an id -- sibling rows aren't committed/real yet).
+  // Aug 2026: an exact-name check alone missed same-file duplicates spelled
+  // differently, so an AI pass (see gemini.ts) sets this when it's
+  // confident two rows are the same person; duplicateReason is its rationale.
+  duplicateOfRowIndex Int?
+  duplicateReason String?
   status         ImportRowStatus @default(PENDING)
   createdAt      DateTime        @default(now())
 

@@ -118,10 +118,18 @@ export function ImportBatchPage() {
   return (
     <div>
       <h1 className="text-xl font-semibold mb-1">{batch.filename}</h1>
-      <p className="text-sm mb-6" style={{ color: "var(--ink-muted)" }}>
+      <p className="text-sm mb-1" style={{ color: "var(--ink-muted)" }}>
         {batch.rows.length} rows extracted{batch.usedAi ? " with AI assistance" : ""}. Review, fix anything
         wrong, then approve what's ready to become real member records.
       </p>
+      {batch.skippedRowCount > 0 && (
+        <p className="text-sm mb-6" style={{ color: "var(--warn)" }}>
+          {batch.skippedRowCount} row{batch.skippedRowCount === 1 ? "" : "s"} from the file couldn't be
+          matched to a name and {batch.skippedRowCount === 1 ? "wasn't" : "weren't"} included above -- check
+          for blank name cells or extra header/divider rows in the original spreadsheet.
+        </p>
+      )}
+      {batch.skippedRowCount === 0 && <div className="mb-6" />}
 
       {summary && (
         <div className="rounded-md px-3 py-2 mb-4 text-sm max-w-xl" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
@@ -229,6 +237,11 @@ export function ImportBatchPage() {
                   {row.possibleDuplicateOfId && (
                     <div className="text-xs mt-0.5" style={{ color: "var(--warn)" }}>
                       Possible duplicate of an existing member
+                    </div>
+                  )}
+                  {row.duplicateOfRowIndex !== null && (
+                    <div className="text-xs mt-0.5" title={row.duplicateReason ?? undefined} style={{ color: "var(--warn)" }}>
+                      Possible duplicate of row {row.duplicateOfRowIndex + 1} in this file
                     </div>
                   )}
                 </td>
