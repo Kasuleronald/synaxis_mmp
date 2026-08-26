@@ -159,7 +159,7 @@ export function RegisterPage() {
             className="w-full rounded-md border px-3 py-2 text-sm"
             style={{ borderColor: "var(--line)" }}
           >
-            <option value="">Prefer not to say</option>
+            <option value="">Select Gender</option>
             {Object.entries(GENDER_LABELS).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
