@@ -361,14 +361,15 @@ export function OrgAdminPage() {
           {users.map((u) => (
             <div
               key={u.id}
-              className="px-4 py-3 border-t first:border-t-0 text-sm flex items-center justify-between"
+              className="px-4 py-3 border-t first:border-t-0 text-sm"
               style={{ borderColor: "var(--line-soft)" }}
             >
-              <span>{u.fullName}</span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-medium">{u.fullName}</span>
                 <span style={{ color: "var(--ink-muted)" }}>{u.role.replace(/_/g, " ").toLowerCase()}</span>
-                {u.role !== Role.ORG_ADMIN && (
-                  <>
+              </div>
+              {u.role !== Role.ORG_ADMIN && (
+                <div className="flex items-center gap-2 flex-wrap mt-2">
                     <button
                       type="button"
                       onClick={() => onToggleApprover(u)}
@@ -447,9 +448,8 @@ export function OrgAdminPage() {
                     >
                       {u.isDevotionalEditor ? "Devotional editor ✓" : "Make devotional editor"}
                     </button>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
