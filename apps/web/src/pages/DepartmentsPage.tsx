@@ -259,7 +259,10 @@ export function DepartmentsPage() {
         />
       )}
 
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
+      {/* overflow-hidden gives the list its rounded corners, but it also clips the
+          leader-search dropdown's popup while a row is being edited -- drop the clip
+          for that case so the popup isn't cut off. */}
+      <div className={`rounded-xl border ${editingId ? "" : "overflow-hidden"}`} style={{ borderColor: "var(--line)" }}>
         {tree.length === 0 && (
           <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
             No directorates yet.
