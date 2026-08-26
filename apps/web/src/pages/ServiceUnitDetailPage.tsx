@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import type { MemberDto, ServiceUnitAttendanceDto, ServiceUnitDto } from "@life-mmp/shared";
 import { api } from "../lib/api";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
-import { IconButton, TrashIcon } from "../components/icons";
+import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 
 type UnitWithMembers = ServiceUnitDto & {
   members: { id: string; memberId: string; joinedAt: string; member: { id: string; fullName: string; phone: string | null } }[];
@@ -16,6 +16,12 @@ export function ServiceUnitDetailPage() {
   const [addMemberId, setAddMemberId] = useState("");
   const [attendance, setAttendance] = useState<ServiceUnitAttendanceDto | null>(null);
   const [showAttendance, setShowAttendance] = useState(false);
+
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editLeaderId, setEditLeaderId] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -51,6 +57,30 @@ export function ServiceUnitDetailPage() {
     setShowAttendance(true);
   }
 
+  function startEdit() {
+    if (!unit) return;
+    setEditName(unit.name);
+    setEditDescription(unit.description ?? "");
+    setEditLeaderId(unit.leaderId ?? "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!id) return;
+    setSaving(true);
+    try {
+      await api.patch(`/service-units/${id}`, {
+        name: editName,
+        description: editDescription || undefined,
+        leaderId: editLeaderId || undefined,
+      });
+      setEditing(false);
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const availableToAdd = members.filter((m) => !unit?.members.some((um) => um.memberId === m.id));
 
   if (!unit) {
@@ -59,10 +89,63 @@ export function ServiceUnitDetailPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold mb-1">{unit.name}</h1>
-      <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
-        {[unit.leader?.fullName ? `Led by ${unit.leader.fullName}` : null, unit.description].filter(Boolean).join(" · ") || "No details set"}
-      </p>
+      {editing ? (
+        <section className="rounded-xl border p-4 mb-4 grid gap-3" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+          <div>
+            <label className="block text-sm mb-1">Name</label>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Description</label>
+            <input
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Leader</label>
+            <MemberSearchSelect members={members} value={editLeaderId} onChange={setEditLeaderId} emptyLabel="None" />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={saveEdit}
+              className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60"
+              style={{ background: "var(--accent)", color: "white" }}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-md px-4 py-2 text-sm font-medium"
+              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-xl font-semibold">{unit.name}</h1>
+          <IconButton title="Edit service unit" onClick={startEdit}>
+            <EditIcon />
+          </IconButton>
+        </div>
+      )}
+      {!editing && (
+        <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
+          {[unit.leader?.fullName ? `Led by ${unit.leader.fullName}` : null, unit.description].filter(Boolean).join(" · ") || "No details set"}
+        </p>
+      )}
 
       <section className="rounded-xl border p-4 mb-4" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
         <h2 className="text-sm font-medium mb-3">Add a member</h2>

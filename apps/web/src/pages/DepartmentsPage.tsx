@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { OrgUnitType, type OrgUnitDto } from "@life-mmp/shared";
+import { OrgUnitType, type MemberDto, type OrgUnitDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
 import { useOrg } from "../context/OrgContext";
 import { useTerminology } from "../hooks/useTerminology";
 
@@ -20,19 +21,24 @@ export function DepartmentsPage() {
   // to stand alone (e.g. "Ministries").
   const pageTitle = org?.departmentTerm || "Directorates & departments";
   const [tree, setTree] = useState<OrgUnitNode[]>([]);
+  const [members, setMembers] = useState<MemberDto[]>([]);
   const [name, setName] = useState("");
   const [type, setType] = useState<OrgUnitType>(OrgUnitType.DIRECTORATE);
   const [parentId, setParentId] = useState("");
+  const [headId, setHeadId] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editHeadId, setEditHeadId] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<Record<string, string>>({});
 
   async function load() {
-    setTree(await api.get<OrgUnitNode[]>("/org-units"));
+    const [t, m] = await Promise.all([api.get<OrgUnitNode[]>("/org-units"), api.get<MemberDto[]>("/members")]);
+    setTree(t);
+    setMembers(m);
   }
 
   useEffect(() => {
@@ -46,8 +52,10 @@ export function DepartmentsPage() {
         name,
         type,
         parentId: type === OrgUnitType.DEPARTMENT ? parentId : undefined,
+        headId: headId || undefined,
       });
       setName("");
+      setHeadId("");
       setConfirming(false);
       await load();
     } finally {
@@ -58,10 +66,11 @@ export function DepartmentsPage() {
   function startEdit(unit: OrgUnitNode) {
     setEditingId(unit.id);
     setEditName(unit.name);
+    setEditHeadId(unit.headId ?? "");
   }
 
   async function saveEdit(id: string) {
-    await api.patch(`/org-units/${id}`, { name: editName });
+    await api.patch(`/org-units/${id}`, { name: editName, headId: editHeadId || undefined });
     setEditingId(null);
     await load();
   }
@@ -85,24 +94,34 @@ export function DepartmentsPage() {
       <div style={{ background: indent ? "var(--surface-2)" : undefined }}>
         <div className={`flex items-center justify-between px-4 py-3 ${indent ? "pl-8" : ""}`}>
           {isEditing ? (
-            <div className="flex-1 flex items-center gap-2">
-              <input
-                autoFocus
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="flex-1 rounded-md border px-2 py-1 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              />
-              <button type="button" onClick={() => saveEdit(unit.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
-                Save
-              </button>
-              <button type="button" onClick={() => setEditingId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>
-                Cancel
-              </button>
+            <div className="flex-1 grid gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="flex-1 rounded-md border px-2 py-1 text-sm"
+                  style={{ borderColor: "var(--line)" }}
+                />
+                <button type="button" onClick={() => saveEdit(unit.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                  Cancel
+                </button>
+              </div>
+              <MemberSearchSelect members={members} value={editHeadId} onChange={setEditHeadId} emptyLabel="No leader set" placeholder="Search for a leader…" />
             </div>
           ) : (
             <>
-              <span className={indent ? "text-sm" : "text-sm font-semibold"}>{unit.name}</span>
+              <div>
+                <span className={indent ? "text-sm" : "text-sm font-semibold"}>{unit.name}</span>
+                {unit.head && (
+                  <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                    Led by {unit.head.fullName}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
                   {unit._count.members} members
@@ -211,6 +230,10 @@ export function DepartmentsPage() {
           />
         </div>
         <div className="sm:col-span-2">
+          <label className="block text-sm mb-1">Leader (optional)</label>
+          <MemberSearchSelect members={members} value={headId} onChange={setHeadId} emptyLabel="None yet" placeholder="Search for a leader…" />
+        </div>
+        <div className="sm:col-span-2">
           <button
             type="submit"
             className="rounded-md px-4 py-2 text-sm font-medium"
@@ -231,6 +254,7 @@ export function DepartmentsPage() {
             { label: "Type", value: type === OrgUnitType.DIRECTORATE ? "Directorate" : "Department" },
             { label: "Name", value: name },
             { label: "Under directorate", value: tree.find((d) => d.id === parentId)?.name ?? "" },
+            { label: "Leader", value: members.find((m) => m.id === headId)?.fullName ?? "" },
           ]}
         />
       )}

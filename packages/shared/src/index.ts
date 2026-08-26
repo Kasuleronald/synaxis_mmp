@@ -626,6 +626,7 @@ export interface OrgUnitDto {
   type: OrgUnitType;
   name: string;
   headId: string | null;
+  head?: { id: string; fullName: string } | null;
   children?: OrgUnitDto[];
 }
 

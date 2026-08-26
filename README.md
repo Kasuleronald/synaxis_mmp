@@ -2,7 +2,18 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-26 (Trainings/Daily Devotional/Soul Winning/Service Units, plus everything since 08-20 -- see the two new sections right below, newest first)
+**Last updated:** 2026-08-27 (Onyx theme, scheduled devotionals, pledge editing, several fixes -- see the newest section right below)
+
+## 2026-08-27 — Onyx theme, scheduled Daily Devotional entries, pledge editing, several fixes
+
+- **Onyx theme** -- a neutral grey option (#1b1b1b), first in the Settings theme picker and now the default for newly created organizations (existing ones keep whatever they already had). Also fixed a small bug this surfaced: two other spots (the Platform Admin create-organization form) still hardcoded the old default in their own local state, missed the first time.
+- **Daily Devotional can now be scheduled ahead** -- writing one is no longer locked to "today"; pick any date, including future ones, and lodge as many as you like. A date can never have more than one (the database already enforced this via a unique constraint on org+date; the UI now surfaces it properly -- picking a date that already has an entry loads it for editing instead of risking a silent overwrite or confusion). Also finished the terminology pass from the 08-26 batch: your custom name for this feature now shows everywhere it's mentioned (the page heading and body itself, the "make devotional editor" Staff & Roles grant) -- previously the sidebar label was the only spot that actually used your renamed term.
+- **Pledges can now be edited** -- fund, amount, frequency, end date, notes (who's pledging is intentionally not editable; that's a different pledge, not a correction). Previously create + list + reactivate-when-archived only.
+- **Service Units can now be edited after creation** -- name, description, and leader, from an edit icon on the unit's own page. The backend endpoint for this existed since the 08-26 batch; only the "add a description later" UI was missing, which is what you flagged.
+- **Directorates and departments can now have a leader** -- assign one at creation or add/change one later from the inline edit form, same searchable member picker used everywhere else. Previously there was no way to name a head at all.
+- **Layout fix**: the Staff & Roles list was overlapping/overflowing with a long name and several toggle grants -- six of them now, after 08-26 added three more. Split into two rows that each wrap independently instead of fighting for space in one line.
+- **Layout change (your request)**: Branches and Staff & Roles on the Organization Admin page are now both full-width, stacked (previously side by side in two narrower columns).
+- **Self-registration**: the gender dropdown's placeholder now reads "Select Gender" instead of "Prefer not to say".
 
 ## 2026-08-26 — Trainings, Daily Devotional, Soul Winning, Service Units, event registration links, export-all-reports
 
