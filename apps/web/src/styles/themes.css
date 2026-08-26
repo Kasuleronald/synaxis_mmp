@@ -39,7 +39,22 @@
    text tokens are opacity-stepped white, chosen for contrast against that
    fixed dark fill rather than swapped per mode. */
 
-/* Growth -- default. Renewal; the platform's own root idea. */
+/* Onyx -- default (Aug 2026). Neutral grey, no denominational/seasonal
+   color association -- the safe first choice before a church picks a hue
+   that says something about them. */
+[data-theme="onyx"] {
+  --accent: #1b1b1b;
+  --accent-ink: #0d0d0d;
+  --accent-soft: #eaeaea;
+  --sidebar-bg: #0d0d0d;
+}
+[data-theme="onyx"][data-mode="dark"] {
+  --accent: #9a9a9a;
+  --accent-ink: #d6d6d6;
+  --accent-soft: #2a2a2a;
+}
+
+/* Growth -- renewal; the platform's own root idea. */
 [data-theme="growth"] {
   --accent: #1b7a57;
   --accent-ink: #0e4b34;

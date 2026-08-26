@@ -18,7 +18,7 @@ export function PlatformAdminPage() {
   const [displayName, setDisplayName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [theme, setTheme] = useState<Theme>(Theme.GROWTH);
+  const [theme, setTheme] = useState<Theme>(Theme.ONYX);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -54,7 +54,7 @@ export function PlatformAdminPage() {
     setDisplayName("");
     setSlug("");
     setSlugTouched(false);
-    setTheme(Theme.GROWTH);
+    setTheme(Theme.ONYX);
     setAdminEmail("");
     setAdminName("");
     setAdminPassword("");

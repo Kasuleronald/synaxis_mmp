@@ -3,6 +3,7 @@ import { Role, type DevotionalDto } from "@life-mmp/shared";
 import { useAuth } from "../context/AuthContext";
 import { useTerminology } from "../hooks/useTerminology";
 import { api } from "../lib/api";
+import { EditIcon, IconButton } from "../components/icons";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -14,8 +15,9 @@ export function DevotionalPage() {
   const canEdit = user?.role === Role.ORG_ADMIN || user?.isDevotionalEditor;
 
   const [today, setToday] = useState<DevotionalDto | null>(null);
-  const [history, setHistory] = useState<DevotionalDto[]>([]);
+  const [all, setAll] = useState<DevotionalDto[]>([]);
   const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState(todayIso());
   const [title, setTitle] = useState("");
   const [scripture, setScripture] = useState("");
   const [body, setBody] = useState("");
@@ -24,28 +26,36 @@ export function DevotionalPage() {
   async function load() {
     const d = await api.get<DevotionalDto | null>(`/devotionals?date=${todayIso()}`);
     setToday(d);
-    if (d) {
-      setTitle(d.title);
-      setScripture(d.scripture ?? "");
-      setBody(d.body);
-    }
-    setHistory(await api.get<DevotionalDto[]>("/devotionals/history"));
+    setAll(await api.get<DevotionalDto[]>("/devotionals/history"));
   }
 
   useEffect(() => {
     load();
   }, []);
 
-  function openEditor() {
-    if (today) {
-      setTitle(today.title);
-      setScripture(today.scripture ?? "");
-      setBody(today.body);
+  // Every date can hold at most one entry (the server upserts by date), so
+  // picking a date that already has one loads it for editing here instead
+  // of risking a second, silently-merged entry for the same day.
+  function loadDate(newDate: string) {
+    setDate(newDate);
+    const existing = all.find((d) => d.date.slice(0, 10) === newDate) ?? (newDate === todayIso() ? today : null);
+    if (existing) {
+      setTitle(existing.title);
+      setScripture(existing.scripture ?? "");
+      setBody(existing.body);
     } else {
       setTitle("");
       setScripture("");
       setBody("");
     }
+  }
+
+  function openEditor(existing?: DevotionalDto) {
+    const d = existing ? existing.date.slice(0, 10) : todayIso();
+    setDate(d);
+    setTitle(existing?.title ?? "");
+    setScripture(existing?.scripture ?? "");
+    setBody(existing?.body ?? "");
     setEditing(true);
   }
 
@@ -53,7 +63,7 @@ export function DevotionalPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post("/devotionals", { date: todayIso(), title, scripture: scripture || undefined, body });
+      await api.post("/devotionals", { date, title, scripture: scripture || undefined, body });
       setEditing(false);
       await load();
     } finally {
@@ -61,22 +71,25 @@ export function DevotionalPage() {
     }
   }
 
+  const otherEntries = all
+    .filter((d) => d.date.slice(0, 10) !== todayIso())
+    .sort((a, b) => a.date.localeCompare(b.date));
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-xl font-semibold mb-1">{terms.devotional}</h1>
       <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
-        One entry a day, visible to everyone signed in.{" "}
-        {canEdit ? "You can write or update today's." : "Only appointed editors and the Org Admin can write one."}
+        One entry per date -- {canEdit ? "write one for today, or schedule as many ahead of time as you like; picking a date that already has one loads it for editing instead of creating a duplicate." : "only appointed editors and the Org Admin can write one."}
       </p>
 
       {canEdit && !editing && (
         <button
           type="button"
-          onClick={openEditor}
+          onClick={() => openEditor()}
           className="rounded-md px-4 py-2 text-sm font-medium mb-4"
           style={{ background: "var(--accent)", color: "white" }}
         >
-          {today ? "Edit today's devotional" : "Write today's devotional"}
+          Write a {terms.devotional.toLowerCase()}
         </button>
       )}
 
@@ -86,6 +99,22 @@ export function DevotionalPage() {
           className="rounded-xl border p-4 mb-6 grid gap-3"
           style={{ borderColor: "var(--line)", background: "var(--surface)" }}
         >
+          <div>
+            <label className="block text-sm mb-1">Date</label>
+            <input
+              required
+              type="date"
+              value={date}
+              onChange={(e) => loadDate(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+            {(all.some((d) => d.date.slice(0, 10) === date) || (date === todayIso() && today)) && (
+              <p className="text-xs mt-1" style={{ color: "var(--warn)" }}>
+                This date already has an entry -- saving will update it, not add a second one.
+              </p>
+            )}
+          </div>
           <div>
             <label className="block text-sm mb-1">Title</label>
             <input
@@ -107,7 +136,7 @@ export function DevotionalPage() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Devotional</label>
+            <label className="block text-sm mb-1">{terms.devotional}</label>
             <textarea
               required
               value={body}
@@ -142,8 +171,15 @@ export function DevotionalPage() {
         <div className="rounded-xl border p-5 mb-6" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
           {today ? (
             <>
-              <div className="text-xs mb-1" style={{ color: "var(--ink-muted)" }}>
-                {new Date(today.date).toLocaleDateString(undefined, { dateStyle: "full" })}
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                  {new Date(today.date).toLocaleDateString(undefined, { dateStyle: "full" })}
+                </span>
+                {canEdit && (
+                  <IconButton title={`Edit today's ${terms.devotional.toLowerCase()}`} onClick={() => openEditor(today)}>
+                    <EditIcon />
+                  </IconButton>
+                )}
               </div>
               <h2 className="text-lg font-semibold mb-1">{today.title}</h2>
               {today.scripture && (
@@ -160,30 +196,42 @@ export function DevotionalPage() {
             </>
           ) : (
             <p className="text-sm" style={{ color: "var(--ink-muted)" }}>
-              Nothing posted for today yet.
+              No {terms.devotional.toLowerCase()} posted for today yet.
             </p>
           )}
         </div>
       )}
 
       <h2 className="text-sm font-medium mb-3" style={{ color: "var(--ink-muted)" }}>
-        Past devotionals
+        Other entries -- past and scheduled ahead
       </h2>
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
-        {history.filter((d) => d.date.slice(0, 10) !== todayIso()).length === 0 && (
+        {otherEntries.length === 0 && (
           <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
             Nothing else yet.
           </div>
         )}
-        {history
-          .filter((d) => d.date.slice(0, 10) !== todayIso())
-          .map((d) => (
+        {otherEntries.map((d) => {
+          const isFuture = d.date.slice(0, 10) > todayIso();
+          return (
             <div key={d.id} className="px-4 py-3 border-t first:border-t-0 text-sm" style={{ borderColor: "var(--line-soft)" }}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{d.title}</span>
-                <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
-                  {new Date(d.date).toLocaleDateString(undefined, { dateStyle: "medium" })}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isFuture && (
+                    <span className="text-xs font-medium rounded-full px-2 py-0.5" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+                      Scheduled
+                    </span>
+                  )}
+                  <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                    {new Date(d.date).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                  </span>
+                  {canEdit && (
+                    <IconButton title="Edit" onClick={() => openEditor(d)}>
+                      <EditIcon />
+                    </IconButton>
+                  )}
+                </div>
               </div>
               {d.scripture && (
                 <div className="text-xs italic mt-0.5" style={{ color: "var(--accent-ink)" }}>
@@ -191,7 +239,8 @@ export function DevotionalPage() {
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
       </div>
     </div>
   );

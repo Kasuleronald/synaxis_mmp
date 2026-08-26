@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { EditIcon, IconButton } from "../components/icons";
+import { useTerminology } from "../hooks/useTerminology";
 
 export function OrgAdminPage() {
+  const terms = useTerminology();
   const [branches, setBranches] = useState<BranchDto[]>([]);
   const [members, setMembers] = useState<MemberDto[]>([]);
   const [users, setUsers] = useState<UserDto[]>([]);
@@ -143,7 +145,7 @@ export function OrgAdminPage() {
   }
 
   return (
-    <div className="max-w-4xl grid gap-8 lg:grid-cols-2">
+    <div className="grid gap-8">
       <section>
         <h1 className="text-xl font-semibold mb-1">Branches</h1>
         <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
@@ -438,7 +440,7 @@ export function OrgAdminPage() {
                     <button
                       type="button"
                       onClick={() => onToggleDevotionalEditorGrant(u)}
-                      title="Lets them write/edit the Daily Devotional"
+                      title={`Lets them write/edit the ${terms.devotional}`}
                       className="rounded-full px-2.5 py-1 text-xs font-medium"
                       style={
                         u.isDevotionalEditor
@@ -446,7 +448,7 @@ export function OrgAdminPage() {
                           : { background: "var(--surface-2)", color: "var(--ink-muted)" }
                       }
                     >
-                      {u.isDevotionalEditor ? "Devotional editor ✓" : "Make devotional editor"}
+                      {u.isDevotionalEditor ? `${terms.devotional} editor ✓` : `Make ${terms.devotional.toLowerCase()} editor`}
                     </button>
                 </div>
               )}

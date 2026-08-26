@@ -12,6 +12,7 @@ import { api } from "../lib/api";
 import { useOrg } from "../context/OrgContext";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
+import { EditIcon, IconButton } from "../components/icons";
 
 function formatMoney(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -42,6 +43,13 @@ export function PledgesPage() {
   const [notes, setNotes] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFundId, setEditFundId] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editFrequency, setEditFrequency] = useState<PledgeFrequency>(PledgeFrequency.MONTHLY);
+  const [editEndDate, setEditEndDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   async function load() {
     const [p, m, pr, f] = await Promise.all([
@@ -88,6 +96,27 @@ export function PledgesPage() {
     const newEndDate = window.prompt("New end date for this pledge (YYYY-MM-DD)?", "");
     if (newEndDate === null) return;
     await api.patch(`/giving/pledges/${p.id}/reactivate`, newEndDate ? { endDate: new Date(newEndDate).toISOString() } : {});
+    await load();
+  }
+
+  function startEdit(p: PledgeDto) {
+    setEditingId(p.id);
+    setEditFundId(p.fundId ?? "");
+    setEditAmount(String(p.amount));
+    setEditFrequency(p.frequency);
+    setEditEndDate(p.endDate ? p.endDate.slice(0, 10) : "");
+    setEditNotes(p.notes ?? "");
+  }
+
+  async function saveEdit(id: string) {
+    await api.patch(`/giving/pledges/${id}`, {
+      fundId: editFundId || undefined,
+      amount: Number(editAmount),
+      frequency: editFrequency,
+      endDate: editEndDate ? new Date(editEndDate).toISOString() : undefined,
+      notes: editNotes || undefined,
+    });
+    setEditingId(null);
     await load();
   }
 
@@ -247,9 +276,36 @@ export function PledgesPage() {
           )}
           {pledges.map((p) => {
             const pct = Math.min(100, Math.round((p.fulfilledAmount / Number(p.amount)) * 100));
+            if (editingId === p.id) {
+              return (
+                <div key={p.id} className="px-4 py-3 border-t first:border-t-0 grid gap-2" style={{ borderColor: "var(--line-soft)" }}>
+                  <div className="text-sm font-medium">{p.member?.fullName ?? p.partner?.name ?? "—"}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select value={editFundId} onChange={(e) => setEditFundId(e.target.value)} className="rounded-md border px-2 py-1.5 text-sm" style={{ borderColor: "var(--line)" }}>
+                      <option value="">General</option>
+                      {funds.map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <select value={editFrequency} onChange={(e) => setEditFrequency(e.target.value as PledgeFrequency)} className="rounded-md border px-2 py-1.5 text-sm" style={{ borderColor: "var(--line)" }}>
+                      {Object.entries(PLEDGE_FREQUENCY_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                    <input type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} placeholder={`Amount (${currency})`} className="rounded-md border px-2 py-1.5 text-sm" style={{ borderColor: "var(--line)" }} />
+                    <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className="rounded-md border px-2 py-1.5 text-sm" style={{ borderColor: "var(--line)" }} />
+                    <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes" className="rounded-md border px-2 py-1.5 text-sm col-span-2" style={{ borderColor: "var(--line)" }} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => saveEdit(p.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>Save</button>
+                    <button type="button" onClick={() => setEditingId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>Cancel</button>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div key={p.id} className="px-4 py-3 border-t first:border-t-0" style={{ borderColor: "var(--line-soft)" }}>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                   <div className="text-sm font-medium">
                     {p.member?.fullName ?? p.partner?.name ?? "—"}{" "}
                     <span style={{ color: "var(--ink-muted)" }}>
@@ -263,6 +319,9 @@ export function PledgesPage() {
                     <span className="text-sm font-semibold">
                       {formatMoney(p.fulfilledAmount, p.currency)} / {formatMoney(Number(p.amount), p.currency)}
                     </span>
+                    <IconButton title="Edit pledge" onClick={() => startEdit(p)}>
+                      <EditIcon />
+                    </IconButton>
                   </div>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: "var(--surface-2)" }}>

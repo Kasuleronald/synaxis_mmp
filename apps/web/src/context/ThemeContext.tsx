@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Platform Administrator has no organization, so they just get the
   // platform default; there's nowhere in their UI to change it.
   const { org, update } = useOrg();
-  const theme: Theme = org?.theme ?? Theme.GROWTH;
+  const theme: Theme = org?.theme ?? Theme.ONYX;
 
   const [mode, setMode] = useState<Mode>(
     () => (localStorage.getItem(MODE_KEY) as Mode | null) ?? (systemPrefersDark() ? "dark" : "light"),

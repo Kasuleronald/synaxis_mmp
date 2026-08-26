@@ -9,6 +9,7 @@ import { UpdateFundDto } from "./dto/update-fund.dto";
 import { CreateVendorDto } from "./dto/create-vendor.dto";
 import { UpdateVendorDto } from "./dto/update-vendor.dto";
 import { CreatePledgeDto } from "./dto/create-pledge.dto";
+import { UpdatePledgeDto } from "./dto/update-pledge.dto";
 import { CreateGivingBatchDto } from "./dto/create-giving-batch.dto";
 import { UpdateGivingBatchDto } from "./dto/update-giving-batch.dto";
 
@@ -290,6 +291,25 @@ export class GivingService {
       const fulfilledByPledge = new Map(fulfilled.map((f) => [f.pledgeId as string, Number(f._sum.amount ?? 0)]));
       return pledges.map((p) => ({ ...p, fulfilledAmount: fulfilledByPledge.get(p.id) ?? 0 }));
     });
+  }
+
+  /** Fund/amount/frequency/dates/notes only -- who's pledging isn't
+   * editable here (that's a different pledge, not a correction). */
+  async updatePledge(ctx: TenantContext, id: string, dto: UpdatePledgeDto) {
+    return runWithTenant(this.prisma, ctx, (tx) =>
+      tx.pledge.update({
+        where: { id },
+        data: {
+          fundId: dto.fundId,
+          amount: dto.amount,
+          frequency: dto.frequency,
+          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+          endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+          notes: dto.notes,
+        },
+        include: PLEDGE_INCLUDE,
+      }),
+    );
   }
 
   /** Manual escape hatch for the auto-archive job below -- an admin decides

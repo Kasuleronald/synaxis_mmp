@@ -4,6 +4,7 @@ import { useOrg } from "../context/OrgContext";
 import { ApiError } from "../lib/api";
 
 const THEME_SWATCHES: Record<Theme, { label: string; color: string }> = {
+  [Theme.ONYX]: { label: "Onyx", color: "#1B1B1B" },
   [Theme.GROWTH]: { label: "Growth", color: "#1B7A57" },
   [Theme.HERITAGE]: { label: "Heritage", color: "#2A3B7C" },
   [Theme.EMBER]: { label: "Ember", color: "#C1502E" },

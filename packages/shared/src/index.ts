@@ -29,6 +29,7 @@ export const ORG_ASSIGNABLE_ROLES: Role[] = [
 ];
 
 export const Theme = {
+  ONYX: "ONYX",
   GROWTH: "GROWTH",
   HERITAGE: "HERITAGE",
   EMBER: "EMBER",
@@ -947,6 +948,15 @@ export interface CreatePledgeInput {
   currency?: string;
   frequency?: PledgeFrequency;
   startDate: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export interface UpdatePledgeInput {
+  fundId?: string;
+  amount?: number;
+  frequency?: PledgeFrequency;
+  startDate?: string;
   endDate?: string;
   notes?: string;
 }

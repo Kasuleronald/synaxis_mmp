@@ -13,6 +13,7 @@ import { UpdateFundDto } from "./dto/update-fund.dto";
 import { CreateVendorDto } from "./dto/create-vendor.dto";
 import { UpdateVendorDto } from "./dto/update-vendor.dto";
 import { CreatePledgeDto } from "./dto/create-pledge.dto";
+import { UpdatePledgeDto } from "./dto/update-pledge.dto";
 import { CreateGivingBatchDto } from "./dto/create-giving-batch.dto";
 import { UpdateGivingBatchDto } from "./dto/update-giving-batch.dto";
 import { GivingService } from "./giving.service";
@@ -129,6 +130,12 @@ export class GivingController {
   @Get("pledges")
   listPledges(@CurrentUser() user: SessionUser) {
     return this.giving.listPledges(tenantContextFor(user));
+  }
+
+  @Patch("pledges/:id")
+  @Roles(...FINANCE_ROLES)
+  updatePledge(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdatePledgeDto) {
+    return this.giving.updatePledge(tenantContextFor(user), id, dto);
   }
 
   @Patch("pledges/:id/reactivate")
