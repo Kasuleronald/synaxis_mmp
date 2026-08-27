@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 
@@ -280,6 +280,43 @@ export class ReportsService {
           givingApproved: a.givingApproved,
         }))
         .sort((a, b) => b.reportsSubmitted - a.reportsSubmitted);
+    });
+  }
+
+  /** Present/absent per service unit for ONE session -- the cross-unit
+   * comparison ("which teams showed up this Sunday"), the mirror image of
+   * ServiceUnitsService.attendance which goes one unit against every
+   * session instead. Reads the same check-in data, no separate roll-call. */
+  async serviceUnitAttendance(ctx: TenantContext, sessionId: string, branchId?: string | null) {
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const session = await tx.attendanceSession.findUnique({
+        where: { id: sessionId },
+        select: { id: true, name: true, date: true },
+      });
+      if (!session) throw new NotFoundException("Attendance session not found");
+
+      const units = await tx.serviceUnit.findMany({
+        where: branchId !== undefined ? { branchId } : undefined,
+        orderBy: { name: "asc" },
+        include: { members: { select: { memberId: true } } },
+      });
+
+      const memberIds = units.flatMap((u) => u.members.map((m: any) => m.memberId));
+      const records = memberIds.length
+        ? await tx.attendanceRecord.findMany({
+            where: { sessionId, memberId: { in: memberIds } },
+            select: { memberId: true },
+          })
+        : [];
+      const presentIds = new Set(records.map((r) => r.memberId as string));
+
+      const units_ = units.map((u) => {
+        const total = u.members.length;
+        const present = u.members.filter((m: any) => presentIds.has(m.memberId)).length;
+        return { unitId: u.id, unitName: u.name, total, present, absent: total - present };
+      });
+
+      return { session, units: units_ };
     });
   }
 }

@@ -16,6 +16,12 @@
   --danger-soft: #f6e4e1;
   --warn: #95611f;
   --warn-soft: #f7ecdd;
+  /* Status pair for data viz (present/absent, on-track/behind) -- fixed,
+     never themed, and never used alone: red/green reads as a status pair
+     to colorblind readers only when backed by a direct label + legend, so
+     every chart using these also labels the value, not just the color. */
+  --status-good: #0ca30c;
+  --status-critical: #d03b3b;
 }
 
 [data-mode="dark"] {

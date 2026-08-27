@@ -66,4 +66,9 @@ export class ReportsController {
   fellowshipLeaderboard(@CurrentUser() user: SessionUser) {
     return this.reports.fellowshipLeaderboard(tenantContextFor(user), branchScopeFor(user));
   }
+
+  @Get("service-unit-attendance")
+  serviceUnitAttendance(@CurrentUser() user: SessionUser, @Query("sessionId") sessionId: string) {
+    return this.reports.serviceUnitAttendance(tenantContextFor(user), sessionId, branchScopeFor(user));
+  }
 }

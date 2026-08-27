@@ -18,6 +18,8 @@ import {
   type MemberStatementDto,
   type MembersOverTimePoint,
   type PledgeDto,
+  type ServiceUnitAttendanceReportDto,
+  type ServiceUnitAttendanceReportRow,
 } from "@life-mmp/shared";
 import { useOrg } from "../context/OrgContext";
 import { api } from "../lib/api";
@@ -80,6 +82,7 @@ function Card({
 const TABS = [
   ["overview", "Members & attendance"],
   ["attendance", "Attendance lists"],
+  ["serviceUnits", "Service units"],
   ["giving", "Giving"],
   ["statements", "Statements"],
   ["pledges", "Pledges"],
@@ -416,6 +419,153 @@ function AttendanceListsTab() {
   );
 }
 
+/** Present/absent stacked per service unit, for one chosen service --
+ * fixed status colors (never the org's accent theme), bar length scaled to
+ * relative unit size so both headcount and turnout rate read at a glance.
+ * Red/green fails the colorblind-separation check by nature of being a
+ * status pair (see palette.md), so every value is also a plain-text direct
+ * label -- never color-alone -- and a table view sits underneath. */
+function ServiceUnitAttendanceChart({ rows }: { rows: ServiceUnitAttendanceReportRow[] }) {
+  const maxTotal = Math.max(1, ...rows.map((r) => r.total));
+
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-4 text-xs" style={{ color: "var(--ink-muted)" }}>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-2.5 rounded-sm" style={{ background: "var(--status-good)" }} />
+          Present
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-2.5 rounded-sm" style={{ background: "var(--status-critical)" }} />
+          Absent
+        </span>
+      </div>
+
+      <div className="grid gap-3 mb-4">
+        {rows.map((r) => {
+          const barWidthPct = (r.total / maxTotal) * 100;
+          const presentShare = r.total > 0 ? (r.present / r.total) * 100 : 0;
+          const absentShare = r.total > 0 ? (r.absent / r.total) * 100 : 0;
+          return (
+            <div key={r.unitId}>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-medium">{r.unitName}</span>
+                <span style={{ color: "var(--ink-muted)" }}>
+                  {r.total === 0 ? "No members" : `${r.present}/${r.total} present`}
+                </span>
+              </div>
+              {r.total > 0 && (
+                <div style={{ width: `${barWidthPct}%`, minWidth: "3rem" }}>
+                  <div className="flex h-2.5 overflow-hidden" style={{ background: "var(--surface)", borderRadius: "0 4px 4px 0" }}>
+                    {r.present > 0 && (
+                      <div
+                        title={`${r.unitName} -- Present: ${r.present}`}
+                        className="h-full transition-opacity hover:opacity-80"
+                        style={{ width: `${presentShare}%`, background: "var(--status-good)" }}
+                      />
+                    )}
+                    {r.present > 0 && r.absent > 0 && <div style={{ width: 2, background: "var(--surface)" }} />}
+                    {r.absent > 0 && (
+                      <div
+                        title={`${r.unitName} -- Absent: ${r.absent}`}
+                        className="h-full transition-opacity hover:opacity-80"
+                        style={{ width: `${absentShare}%`, background: "var(--status-critical)" }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <details>
+        <summary className="text-xs cursor-pointer" style={{ color: "var(--accent-ink)" }}>
+          View as table
+        </summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left border-b" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                <th className="py-1.5 pr-3 font-medium">Service unit</th>
+                <th className="py-1.5 pr-3 font-medium text-right">Present</th>
+                <th className="py-1.5 pr-3 font-medium text-right">Absent</th>
+                <th className="py-1.5 pr-3 font-medium text-right">Total</th>
+                <th className="py-1.5 pr-3 font-medium text-right">Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.unitId} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+                  <td className="py-1.5 pr-3 font-medium">{r.unitName}</td>
+                  <td className="py-1.5 pr-3 text-right">{r.present}</td>
+                  <td className="py-1.5 pr-3 text-right">{r.absent}</td>
+                  <td className="py-1.5 pr-3 text-right">{r.total}</td>
+                  <td className="py-1.5 pr-3 text-right">{r.total > 0 ? `${Math.round((r.present / r.total) * 100)}%` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function ServiceUnitsTab() {
+  const [sessions, setSessions] = useState<AttendanceSessionDto[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [report, setReport] = useState<ServiceUnitAttendanceReportDto | null>(null);
+
+  useEffect(() => {
+    api.get<AttendanceSessionDto[]>("/attendance/sessions").then((all) => {
+      const services = all.filter((s) => !s.classId);
+      setSessions(services);
+      if (services.length > 0) setSessionId(services[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setReport(null);
+      return;
+    }
+    api.get<ServiceUnitAttendanceReportDto>(`/reports/service-unit-attendance?sessionId=${sessionId}`).then(setReport);
+  }, [sessionId]);
+
+  return (
+    <Card
+      title="Present vs. absent, by service unit"
+      exportRows={report?.units.map((u) => ({
+        "Service unit": u.unitName,
+        Present: u.present,
+        Absent: u.absent,
+        Total: u.total,
+        Rate: u.total > 0 ? `${Math.round((u.present / u.total) * 100)}%` : "",
+      }))}
+    >
+      <select
+        value={sessionId}
+        onChange={(e) => setSessionId(e.target.value)}
+        className="w-full rounded-md border px-3 py-2 text-sm mb-4"
+        style={{ borderColor: "var(--line)" }}
+      >
+        {sessions.length === 0 && <option value="">No services recorded yet</option>}
+        {sessions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} · {new Date(s.date).toLocaleDateString(undefined, { dateStyle: "medium" })}
+          </option>
+        ))}
+      </select>
+      {sessionId && report && report.units.length === 0 && (
+        <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No service units set up yet.</p>
+      )}
+      {sessionId && report && report.units.length > 0 && <ServiceUnitAttendanceChart rows={report.units} />}
+    </Card>
+  );
+}
+
 function PledgesTab({ currency }: { currency: string }) {
   const [pledges, setPledges] = useState<PledgeDto[]>([]);
   useEffect(() => {
@@ -573,6 +723,7 @@ export function ReportsPage() {
 
       {tab === "overview" && <OverviewTab />}
       {tab === "attendance" && <AttendanceListsTab />}
+      {tab === "serviceUnits" && <ServiceUnitsTab />}
       {tab === "giving" && <GivingTab currency={currency} />}
       {tab === "statements" && <StatementsTab currency={currency} />}
       {tab === "pledges" && <PledgesTab currency={currency} />}

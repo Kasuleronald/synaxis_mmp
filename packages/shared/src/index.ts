@@ -486,6 +486,7 @@ export interface AttendanceSessionDto {
   organizationId: string;
   branchId: string | null;
   eventId: string | null;
+  classId: string | null;
   name: string;
   date: string;
   qrToken: string;
@@ -1144,6 +1145,19 @@ export interface FellowshipLeaderboardEntryDto {
   averageAttendance: number;
   givingReported: number;
   givingApproved: number;
+}
+
+export interface ServiceUnitAttendanceReportRow {
+  unitId: string;
+  unitName: string;
+  total: number;
+  present: number;
+  absent: number;
+}
+
+export interface ServiceUnitAttendanceReportDto {
+  session: { id: string; name: string; date: string };
+  units: ServiceUnitAttendanceReportRow[];
 }
 
 export interface NotificationDto {
