@@ -205,6 +205,7 @@ model User {
   registrationsReviewed    SelfRegistration[] @relation("RegistrationReviewedBy")
   assetsUploaded           Asset[]            @relation("AssetUploadedBy")
   fixedAssetsAdded         FixedAsset[]       @relation("FixedAssetAddedBy")
+  pledgesCreated           Pledge[]           @relation("PledgeCreatedBy")
   conditionRequestsMade    AssetConditionRequest[] @relation("ConditionRequestedBy")
   conditionRequestsAnswered AssetConditionRequest[] @relation("ConditionRespondedBy")
   fixedAssetEditRequestsMade     FixedAssetEditRequest[] @relation("FixedAssetEditRequestedBy")
@@ -899,6 +900,8 @@ model Pledge {
   startDate      DateTime
   endDate        DateTime?
   notes          String?
+  createdById    String?
+  createdBy      User?    @relation("PledgeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
 
   records GivingRecord[]

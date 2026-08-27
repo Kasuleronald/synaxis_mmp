@@ -124,7 +124,7 @@ export class GivingController {
   @Post("pledges")
   @Roles(...FINANCE_ROLES)
   createPledge(@CurrentUser() user: SessionUser, @Body() dto: CreatePledgeDto) {
-    return this.giving.createPledge(tenantContextFor(user), dto);
+    return this.giving.createPledge(tenantContextFor(user), user.id, dto);
   }
 
   @Get("pledges")

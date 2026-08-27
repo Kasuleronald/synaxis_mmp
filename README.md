@@ -2,7 +2,14 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-27 (Onyx theme, scheduled devotionals, pledge editing, several fixes -- see the newest section right below)
+**Last updated:** 2026-08-27 (Attendance walk-in alignment, full Add Member dialog, pledge payments + notifications -- see the newest section right below)
+
+## 2026-08-27 (2) — Attendance walk-in alignment, full Add Member dialog, pledge payment tracking + notifications
+
+- **Align a walk-in with a member added after the fact** -- if an usher checked someone in as a walk-in and they were later added as a proper Member separately (instead of using "Add as a new member" on the spot), Attendance now has a "Link to an existing member" action per unlinked walk-in, so their check-in points at the real record instead of staying an orphaned duplicate. The picker excludes anyone already checked in to that same session, to avoid creating two attendance records for one person.
+- **"Add as a new member" now shows the full Add Member form** -- gender, birthday, marital/working status, nationality, leadership roles, household, fellowship, all of it -- not just phone and address. Reused the same dialog the Members page already uses for viewing/editing, extended with a new "create" mode.
+- **Pledge payments now have somewhere to go** -- Giving records could always carry a `pledgeId` on the backend, but nothing in the UI ever set one, so a pledge's progress bar never actually moved. Pledges now has a "Record a payment" action right on each active pledge (category, amount, method, date, notes), which posts the giving entry tied to that pledge.
+- **Whoever logged a pledge gets notified when it's paid** -- every payment recorded against a pledge (full or partial) notifies the staff member who originally captured it, with the running fulfilled percentage, the same in-app + email notification pattern used for fellowship report reviews.
 
 ## 2026-08-27 — Onyx theme, scheduled Daily Devotional entries, pledge editing, several fixes
 

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateGivingCategoryDto } from "./dto/create-giving-category.dto";
 import { RenameGivingCategoryDto } from "./dto/rename-giving-category.dto";
 import { CreateGivingRecordDto } from "./dto/create-giving-record.dto";
@@ -29,7 +30,10 @@ const PLEDGE_INCLUDE = {
 
 @Injectable()
 export class GivingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // --- Categories (hierarchical) -----------------------------------------
 
@@ -75,7 +79,7 @@ export class GivingService {
         });
         currency = org?.currency ?? "UGX";
       }
-      return tx.givingRecord.create({
+      const record = await tx.givingRecord.create({
         data: {
           organizationId: ctx.organizationId as string,
           branchId: dto.branchId,
@@ -95,7 +99,34 @@ export class GivingService {
         },
         include: RECORD_INCLUDE,
       });
+
+      if (dto.pledgeId) await this.notifyPledgeCreator(tx, record.organizationId, dto.pledgeId, dto.amount, currency);
+
+      return record;
     });
+  }
+
+  /** Whoever logged a pledge wants to know when their pledger actually pays
+   * something toward it -- partial or full, every giving entry tied to the
+   * pledge fires this, since a part-payment is still progress worth seeing. */
+  private async notifyPledgeCreator(tx: any, organizationId: string, pledgeId: string, paidAmount: number, currency: string) {
+    const pledge = await tx.pledge.findUnique({
+      where: { id: pledgeId },
+      include: { member: { select: { fullName: true } }, partner: { select: { name: true } } },
+    });
+    if (!pledge?.createdById) return;
+    const fulfilled = await tx.givingRecord.aggregate({ where: { pledgeId }, _sum: { amount: true } });
+    const fulfilledAmount = Number(fulfilled._sum.amount ?? 0);
+    const pct = Math.min(100, Math.round((fulfilledAmount / Number(pledge.amount)) * 100));
+    const pledgerName = pledge.member?.fullName ?? pledge.partner?.name ?? "Someone";
+    await this.notifications.notifyWithinTx(
+      tx,
+      organizationId,
+      [pledge.createdById],
+      "PLEDGE_PAYMENT_RECEIVED",
+      `${pledgerName} paid ${paidAmount} ${currency} toward their pledge -- ${pct}% fulfilled.`,
+      "/finance/pledges",
+    );
   }
 
   async listRecords(ctx: TenantContext, from?: string, to?: string, batchId?: string) {
@@ -247,7 +278,7 @@ export class GivingService {
 
   // --- Pledges ------------------------------------------------------------
 
-  async createPledge(ctx: TenantContext, dto: CreatePledgeDto) {
+  async createPledge(ctx: TenantContext, createdById: string, dto: CreatePledgeDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
     if (!dto.memberId === !dto.partnerId) {
       // XOR: both set, or neither -- either way, that's not a valid pledger.
@@ -274,6 +305,7 @@ export class GivingService {
           startDate: new Date(dto.startDate),
           endDate: dto.endDate ? new Date(dto.endDate) : undefined,
           notes: dto.notes,
+          createdById,
         },
         include: PLEDGE_INCLUDE,
       });

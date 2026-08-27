@@ -1,11 +1,50 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from "qrcode";
-import type { AttendanceRecordDto, AttendanceSessionDto, MemberDto } from "@life-mmp/shared";
+import { MemberStatus, type AttendanceRecordDto, type AttendanceSessionDto, type FellowshipDto, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
-import { IconButton, TrashIcon, UserPlusIcon } from "../components/icons";
+import { IconButton, LinkIcon, TrashIcon, UserPlusIcon } from "../components/icons";
+import { MemberDialog } from "../components/MemberDialog";
+import { MemberSearchSelect } from "../components/MemberSearchSelect";
+
+/** A blank-slate MemberDto so the full MemberDialog can run in "create" mode
+ * prefilled with a walk-in's name/phone -- every other field starts empty,
+ * same as a brand-new member would. */
+function blankMemberFor(visitorName: string, visitorPhone: string | null): MemberDto {
+  const now = new Date().toISOString();
+  return {
+    id: "",
+    organizationId: "",
+    branchId: null,
+    householdId: null,
+    householdRole: null,
+    fellowshipId: null,
+    orgUnitId: null,
+    createdById: null,
+    fullName: visitorName,
+    memberNumber: null,
+    gender: null,
+    nationality: null,
+    birthMonth: null,
+    birthDay: null,
+    birthYear: null,
+    maritalStatus: null,
+    workingStatus: null,
+    isStudent: null,
+    school: null,
+    phone: visitorPhone,
+    email: null,
+    address: null,
+    status: MemberStatus.VISITOR,
+    leadershipRoles: [],
+    notes: null,
+    joinedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export function AttendanceSessionPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,9 +55,14 @@ export function AttendanceSessionPage() {
   const [results, setResults] = useState<MemberDto[]>([]);
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
+  const [allMembers, setAllMembers] = useState<MemberDto[]>([]);
+  const [households, setHouseholds] = useState<HouseholdDto[]>([]);
+  const [fellowships, setFellowships] = useState<FellowshipDto[]>([]);
   const [addMemberFor, setAddMemberFor] = useState<AttendanceRecordDto | null>(null);
-  const [addMemberAddress, setAddMemberAddress] = useState("");
-  const [addMemberError, setAddMemberError] = useState<string | null>(null);
+  const [linkingFor, setLinkingFor] = useState<AttendanceRecordDto | null>(null);
+  const [linkMemberId, setLinkMemberId] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
 
   const checkInUrl = session ? `${window.location.origin}/checkin/${session.qrToken}` : "";
 
@@ -39,6 +83,12 @@ export function AttendanceSessionPage() {
     setSession(s);
     setRecords(await api.get<AttendanceRecordDto[]>(`/attendance/sessions/${id}/records`));
   }
+
+  useEffect(() => {
+    api.get<MemberDto[]>("/members").then(setAllMembers).catch(() => {});
+    api.get<HouseholdDto[]>("/households").then(setHouseholds).catch(() => {});
+    api.get<FellowshipDto[]>("/fellowships").then(setFellowships).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadSession();
@@ -118,33 +168,42 @@ export function AttendanceSessionPage() {
 
   function openAddMember(record: AttendanceRecordDto) {
     setAddMemberFor(record);
-    setAddMemberAddress("");
-    setAddMemberError(null);
   }
 
-  async function submitAddMember(e: FormEvent) {
-    e.preventDefault();
+  async function linkRecordToMember(record: AttendanceRecordDto, member: MemberDto) {
+    const updated = await api.patch<AttendanceRecordDto>(
+      `/attendance/sessions/${id}/records/${record.id}/link-member`,
+      { memberId: member.id },
+    );
+    setRecords((r) => r.map((x) => (x.id === record.id ? { ...updated, member: { id: member.id, fullName: member.fullName, phone: member.phone } } : x)));
+  }
+
+  async function onWalkInPromoted(created: MemberDto) {
     if (!addMemberFor) return;
-    if (!addMemberAddress.trim()) {
-      setAddMemberError("Address is required.");
-      return;
-    }
-    setAddMemberError(null);
+    await linkRecordToMember(addMemberFor, created);
+    setAllMembers((m) => [...m, created]);
+    setAddMemberFor(null);
+  }
+
+  function openLinkExisting(record: AttendanceRecordDto) {
+    setLinkingFor(record);
+    setLinkMemberId("");
+    setLinkError(null);
+  }
+
+  async function submitLinkExisting() {
+    if (!linkingFor || !linkMemberId) return;
+    const member = allMembers.find((m) => m.id === linkMemberId);
+    if (!member) return;
+    setLinking(true);
+    setLinkError(null);
     try {
-      const newMember = await api.post<MemberDto>("/members", {
-        id: crypto.randomUUID(),
-        fullName: addMemberFor.visitorName ?? "",
-        phone: addMemberFor.visitorPhone ?? "",
-        address: addMemberAddress.trim(),
-      });
-      const updated = await api.patch<AttendanceRecordDto>(
-        `/attendance/sessions/${id}/records/${addMemberFor.id}/link-member`,
-        { memberId: newMember.id },
-      );
-      setRecords((r) => r.map((x) => (x.id === addMemberFor.id ? { ...updated, member: { id: newMember.id, fullName: newMember.fullName, phone: newMember.phone } } : x)));
-      setAddMemberFor(null);
+      await linkRecordToMember(linkingFor, member);
+      setLinkingFor(null);
     } catch (err) {
-      setAddMemberError(err instanceof ApiError ? err.message : "Couldn't add this member. Try again.");
+      setLinkError(err instanceof ApiError ? err.message : "Couldn't link this check-in. Try again.");
+    } finally {
+      setLinking(false);
     }
   }
 
@@ -267,9 +326,14 @@ export function AttendanceSessionPage() {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {!r.memberId && (
-                  <IconButton title="Add as a member" onClick={() => openAddMember(r)}>
-                    <UserPlusIcon />
-                  </IconButton>
+                  <>
+                    <IconButton title="Link to an existing member" onClick={() => openLinkExisting(r)}>
+                      <LinkIcon />
+                    </IconButton>
+                    <IconButton title="Add as a new member" onClick={() => openAddMember(r)}>
+                      <UserPlusIcon />
+                    </IconButton>
+                  </>
                 )}
                 <IconButton title="Remove from this session" onClick={() => deleteRecord(r)}>
                   <TrashIcon />
@@ -281,42 +345,50 @@ export function AttendanceSessionPage() {
       </section>
 
       {addMemberFor && (
+        <MemberDialog
+          member={blankMemberFor(addMemberFor.visitorName ?? "", addMemberFor.visitorPhone)}
+          members={allMembers}
+          households={households}
+          fellowships={fellowships}
+          initialMode="create"
+          onClose={() => setAddMemberFor(null)}
+          onChange={onWalkInPromoted}
+        />
+      )}
+
+      {linkingFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
-          <form
-            onSubmit={submitAddMember}
-            className="w-full max-w-sm rounded-xl border p-4 grid gap-3"
-            style={{ borderColor: "var(--line)", background: "var(--surface)" }}
-          >
-            <h3 className="text-sm font-medium">Add {addMemberFor.visitorName} as a member</h3>
-            <label className="text-sm grid gap-1">
-              Phone
-              <input
-                value={addMemberFor.visitorPhone ?? ""}
-                onChange={(e) => setAddMemberFor((f) => (f ? { ...f, visitorPhone: e.target.value } : f))}
-                className="rounded-md border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              />
-            </label>
-            <label className="text-sm grid gap-1">
-              Address
-              <input
-                value={addMemberAddress}
-                onChange={(e) => setAddMemberAddress(e.target.value)}
-                required
-                className="rounded-md border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              />
-            </label>
-            {addMemberError && <p className="text-sm" style={{ color: "#b91c1c" }}>{addMemberError}</p>}
+          <div className="w-full max-w-sm rounded-xl border p-4 grid gap-3" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+            <h3 className="text-sm font-medium">
+              Align "{linkingFor.visitorName}" with an existing member
+            </h3>
+            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+              For a walk-in who was already added as a member separately after the service -- this
+              links their check-in to that member record instead of creating a duplicate.
+            </p>
+            <MemberSearchSelect
+              members={allMembers.filter((m) => !checkedInMemberIds.has(m.id))}
+              value={linkMemberId}
+              onChange={setLinkMemberId}
+              placeholder="Search for the member…"
+              emptyLabel="Choose a member"
+            />
+            {linkError && <p className="text-sm" style={{ color: "#b91c1c" }}>{linkError}</p>}
             <div className="flex justify-end gap-2 mt-1">
-              <button type="button" onClick={() => setAddMemberFor(null)} className="rounded-md px-3 py-1.5 text-sm font-medium" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
+              <button type="button" onClick={() => setLinkingFor(null)} className="rounded-md px-3 py-1.5 text-sm font-medium" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
                 Cancel
               </button>
-              <button type="submit" className="rounded-md px-3 py-1.5 text-sm font-medium" style={{ background: "var(--accent)", color: "white" }}>
-                Add member
+              <button
+                type="button"
+                disabled={!linkMemberId || linking}
+                onClick={submitLinkExisting}
+                className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                {linking ? "Linking…" : "Link"}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </div>

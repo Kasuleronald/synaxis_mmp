@@ -1,18 +1,21 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
+  GIVING_METHOD_LABELS,
+  GivingMethod,
   PLEDGE_FREQUENCY_LABELS,
   PLEDGE_STATUS_LABELS,
   PledgeFrequency,
   type FundDto,
+  type GivingCategoryDto,
   type MemberDto,
   type PartnerDto,
   type PledgeDto,
 } from "@life-mmp/shared";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useOrg } from "../context/OrgContext";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
-import { EditIcon, IconButton } from "../components/icons";
+import { EditIcon, IconButton, PlusCircleIcon } from "../components/icons";
 
 function formatMoney(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -31,6 +34,7 @@ export function PledgesPage() {
   const [members, setMembers] = useState<MemberDto[]>([]);
   const [partners, setPartners] = useState<PartnerDto[]>([]);
   const [funds, setFunds] = useState<FundDto[]>([]);
+  const [categories, setCategories] = useState<GivingCategoryDto[]>([]);
 
   const [pledgerType, setPledgerType] = useState<"member" | "partner">("member");
   const [memberId, setMemberId] = useState("");
@@ -51,17 +55,28 @@ export function PledgesPage() {
   const [editEndDate, setEditEndDate] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
+  const [recordingFor, setRecordingFor] = useState<PledgeDto | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payCategoryId, setPayCategoryId] = useState("");
+  const [payMethod, setPayMethod] = useState<GivingMethod>(GivingMethod.CASH);
+  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payNotes, setPayNotes] = useState("");
+  const [paySaving, setPaySaving] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+
   async function load() {
-    const [p, m, pr, f] = await Promise.all([
+    const [p, m, pr, f, c] = await Promise.all([
       api.get<PledgeDto[]>("/giving/pledges"),
       api.get<MemberDto[]>("/members"),
       api.get<PartnerDto[]>("/partners"),
       api.get<FundDto[]>("/giving/funds"),
+      api.get<GivingCategoryDto[]>("/giving/categories"),
     ]);
     setPledges(p);
     setMembers(m);
     setPartners(pr);
     setFunds(f);
+    setCategories(c);
     if (!memberId && m.length > 0) setMemberId(m[0].id);
   }
 
@@ -118,6 +133,41 @@ export function PledgesPage() {
     });
     setEditingId(null);
     await load();
+  }
+
+  function openRecordPayment(p: PledgeDto) {
+    setRecordingFor(p);
+    setPayAmount("");
+    setPayCategoryId(categories[0]?.id ?? "");
+    setPayMethod(GivingMethod.CASH);
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayNotes("");
+    setPayError(null);
+  }
+
+  async function submitPayment() {
+    if (!recordingFor || !payAmount || !payCategoryId) return;
+    setPaySaving(true);
+    setPayError(null);
+    try {
+      await api.post("/giving/records", {
+        categoryId: payCategoryId,
+        pledgeId: recordingFor.id,
+        fundId: recordingFor.fundId ?? undefined,
+        memberId: recordingFor.memberId ?? undefined,
+        partnerId: recordingFor.partnerId ?? undefined,
+        amount: Number(payAmount),
+        method: payMethod,
+        givenAt: new Date(payDate).toISOString(),
+        notes: payNotes || undefined,
+      });
+      setRecordingFor(null);
+      await load();
+    } catch (err) {
+      setPayError(err instanceof ApiError ? err.message : "Couldn't record this payment.");
+    } finally {
+      setPaySaving(false);
+    }
   }
 
   const pledgerReady = pledgerType === "member" ? !!memberId : !!partnerId;
@@ -319,6 +369,11 @@ export function PledgesPage() {
                     <span className="text-sm font-semibold">
                       {formatMoney(p.fulfilledAmount, p.currency)} / {formatMoney(Number(p.amount), p.currency)}
                     </span>
+                    {p.status === "ACTIVE" && (
+                      <IconButton title="Record a payment toward this pledge" onClick={() => openRecordPayment(p)}>
+                        <PlusCircleIcon />
+                      </IconButton>
+                    )}
                     <IconButton title="Edit pledge" onClick={() => startEdit(p)}>
                       <EditIcon />
                     </IconButton>
@@ -372,6 +427,74 @@ export function PledgesPage() {
             { label: "Notes", value: notes },
           ]}
         />
+      )}
+
+      {recordingFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="w-full max-w-sm rounded-xl border p-4 grid gap-3" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+            <h3 className="text-sm font-medium">
+              Record a payment from {recordingFor.member?.fullName ?? recordingFor.partner?.name ?? "this pledger"}
+            </h3>
+            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+              Counts toward this pledge's progress -- whoever logged it gets notified. A partial
+              amount is fine; the pledge stays active until it's fully met.
+            </p>
+            <div>
+              <label className="block text-sm mb-1">Category</label>
+              <select
+                value={payCategoryId}
+                onChange={(e) => setPayCategoryId(e.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              >
+                {categories.length === 0 && <option value="">No categories yet</option>}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder={`Amount (${recordingFor.currency})`}
+                className="rounded-md border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              />
+              <select value={payMethod} onChange={(e) => setPayMethod(e.target.value as GivingMethod)} className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }}>
+                {Object.entries(GIVING_METHOD_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--line)" }} />
+            <input
+              value={payNotes}
+              onChange={(e) => setPayNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+            {payError && <p className="text-sm" style={{ color: "#b91c1c" }}>{payError}</p>}
+            <div className="flex justify-end gap-2 mt-1">
+              <button type="button" onClick={() => setRecordingFor(null)} className="rounded-md px-3 py-1.5 text-sm font-medium" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!payAmount || !payCategoryId || paySaving}
+                onClick={submitPayment}
+                className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                {paySaving ? "Recording…" : "Record payment"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

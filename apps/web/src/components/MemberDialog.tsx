@@ -105,7 +105,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
   members?: MemberDto[];
   households?: HouseholdDto[];
   fellowships?: FellowshipDto[];
-  initialMode?: "view" | "edit" | "confirmDelete";
+  initialMode?: "view" | "edit" | "confirmDelete" | "create";
   onClose: () => void;
   onChange: (updated: MemberDto) => void;
 }) {
@@ -113,7 +113,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
   const orgDialCode = COUNTRIES.find((c) => c.name === org?.country)?.dialCode ?? "";
 
   const [member, setMember] = useState(initial);
-  const [mode, setMode] = useState<"view" | "edit" | "confirmDelete">(initialMode ?? "view");
+  const [mode, setMode] = useState<"view" | "edit" | "confirmDelete" | "create">(initialMode ?? "view");
 
   const [fullName, setFullName] = useState(initial.fullName);
   const [memberNumber, setMemberNumber] = useState(initial.memberNumber ?? "");
@@ -187,13 +187,16 @@ export function MemberDialog({ member: initial, members, households, fellowships
       fellowshipId: fellowshipId || undefined,
     };
     try {
-      const updated = await api.patch<MemberDto>(`/members/${member.id}`, patch);
-      setMember(updated);
-      await db.members.put(updated);
-      onChange(updated);
+      const saved =
+        mode === "create"
+          ? await api.post<MemberDto>("/members", { id: crypto.randomUUID(), ...patch })
+          : await api.patch<MemberDto>(`/members/${member.id}`, patch);
+      setMember(saved);
+      await db.members.put(saved);
+      onChange(saved);
       setMode("view");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save changes.");
+      setError(err instanceof ApiError ? err.message : `Couldn't ${mode === "create" ? "add this member" : "save changes"}.`);
     } finally {
       setSaving(false);
     }
@@ -229,7 +232,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
       >
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--line-soft)" }}>
           <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>
-            {mode === "edit" ? "Edit member" : member.fullName}
+            {mode === "edit" ? "Edit member" : mode === "create" ? "Add member" : member.fullName}
             {mode === "view" && member.memberNumber && (
               <span className="ml-1.5 text-sm font-normal" style={{ color: "var(--ink-muted)" }}>
                 #{member.memberNumber}
@@ -335,7 +338,7 @@ export function MemberDialog({ member: initial, members, households, fellowships
             </dl>
           )}
 
-          {mode === "edit" && (
+          {(mode === "edit" || mode === "create") && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="block text-sm mb-1">Full name</label>
@@ -497,9 +500,9 @@ export function MemberDialog({ member: initial, members, households, fellowships
               </div>
               <div className="sm:col-span-2 flex gap-2">
                 <button type="button" disabled={saving} onClick={onSave} className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60" style={{ background: "var(--accent)", color: "white" }}>
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? (mode === "create" ? "Adding…" : "Saving…") : mode === "create" ? "Add member" : "Save"}
                 </button>
-                <button type="button" onClick={() => setMode("view")} className="rounded-md px-4 py-2 text-sm font-medium" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
+                <button type="button" onClick={() => (mode === "create" ? onClose() : setMode("view"))} className="rounded-md px-4 py-2 text-sm font-medium" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
                   Cancel
                 </button>
               </div>

@@ -72,7 +72,7 @@ Every gift on file — category, fund, method, giver.
 Designated pools (Building Fund, Missions Fund) separate from category. A fund with a target amount shows a live progress bar and can carry a deadline.
 
 ### Pledges
-A member or partner's commitment to give a total over time. Fulfilled amount is calculated from actual giving, never entered by hand. Editable (amount, fund, frequency, dates, notes) at any time; auto-marked Fulfilled once met, or Archived well past its end date if it never was — archived pledges can be reactivated.
+A member or partner's commitment to give a total over time. Fulfilled amount is calculated from actual giving, never entered by hand. Editable (amount, fund, frequency, dates, notes) at any time; auto-marked Fulfilled once met, or Archived well past its end date if it never was — archived pledges can be reactivated. Record a partial or full payment straight from the pledge itself with "Record a payment" — whoever originally logged the pledge is notified every time a payment lands against it, with the running fulfilled percentage.
 
 ### Partners
 External givers (people, organizations, sister churches) who give without being a Member — tracked with their own giving/pledge history.
@@ -94,7 +94,7 @@ Hierarchical giving categories (add subcategories, rename, remove) and your chur
 ## Operations
 
 ### Attendance
-Start a session (tied to an event or a class, or standalone), then check people in — search an existing member, or take a walk-in's name and phone. Duplicate check-ins for the same session are prevented automatically. Delete a mistaken check-in with the trash icon, or promote a walk-in straight into a full Member record with "Add as a member."
+Start a session (tied to an event or a class, or standalone), then check people in — search an existing member, or take a walk-in's name and phone. Duplicate check-ins for the same session are prevented automatically. Delete a mistaken check-in with the trash icon, or promote a walk-in straight into a full Member record (every field Add Member offers, not just name and phone) with "Add as a new member." If a walk-in was instead added as a Member separately after the service, "Link to an existing member" points their check-in at that real record instead of leaving a duplicate lying around.
 
 ### Assets
 General church assets — photos, flyers, documents.
