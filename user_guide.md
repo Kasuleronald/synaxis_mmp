@@ -122,7 +122,7 @@ One entry per calendar day, but you're not limited to writing today's — schedu
 
 ## Reports (Analytics)
 
-Cross-system aggregated views, tabbed: **Members & attendance** (growth, trends, demographics), **Attendance lists** (download a specific event's attendance list, or pull one member's full attendance history), **Giving** (trends, by category, by fund), **Statements** (a member's or a fund's full running statement), **Pledges** (fulfillment), **Fixed assets** (value by category, condition), **Fellowship leaders** (submission volume, approval rate, average attendance). Every card on every tab has its own Excel export.
+Cross-system aggregated views, tabbed: **Members & attendance** (growth, trends, demographics), **Attendance lists** (download a specific event's attendance list, or pull one member's full attendance history), **Service units** (present vs. absent across every service unit, for one chosen service), **Giving** (trends, by category, by fund), **Statements** (a member's or a fund's full running statement), **Pledges** (fulfillment), **Fixed assets** (value by category, condition), **Fellowship leaders** (submission volume, approval rate, average attendance). Every card on every tab has its own Excel export.
 
 ---
 

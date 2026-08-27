@@ -2,7 +2,11 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-27 (Attendance walk-in alignment, full Add Member dialog, pledge payments + notifications -- see the newest section right below)
+**Last updated:** 2026-08-27 (Cross-unit service attendance chart in Reports -- see the newest section right below)
+
+## 2026-08-27 (3) — Cross-unit service attendance chart
+
+- **Reports has a new "Service units" tab** -- pick one service, see present vs. absent across every service unit at a glance (a requested comparison view, similar to what you'd build by hand in Excel). Each unit's bar is scaled to its own membership so both headcount and turnout rate read together, plus a table view underneath for the exact numbers and an Excel export.
 
 ## 2026-08-27 (2) — Attendance walk-in alignment, full Add Member dialog, pledge payment tracking + notifications
 
