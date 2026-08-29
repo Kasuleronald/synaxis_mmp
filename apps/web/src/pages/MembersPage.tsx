@@ -32,6 +32,15 @@ const ALL_COLUMNS = {
   household: "Household",
   fellowship: "Fellowship",
   addedBy: "Added by",
+  gender: "Gender",
+  email: "Email",
+  address: "Address",
+  nationality: "Nationality",
+  birthday: "Birthday",
+  maritalStatus: "Marital status",
+  workingStatus: "Working status",
+  student: "Student",
+  joinedAt: "Joined",
 } as const;
 type ColumnKey = keyof typeof ALL_COLUMNS;
 const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
@@ -40,7 +49,101 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
   household: true,
   fellowship: true,
   addedBy: true,
+  // New columns default off -- they're there to turn on when you need them,
+  // not to widen everyone's table by default the moment they ship.
+  gender: false,
+  email: false,
+  address: false,
+  nationality: false,
+  birthday: false,
+  maritalStatus: false,
+  workingStatus: false,
+  student: false,
+  joinedAt: false,
 };
+
+type SortKey = "name" | "status" | ColumnKey;
+
+/** Birthday sorts by month+day only, year deliberately ignored -- "who's
+ * coming up" is the useful order for a congregation (same convention the
+ * birthday-reminders job already uses), not chronological age. */
+function sortValue(m: MemberDto, key: SortKey): string | number | null {
+  switch (key) {
+    case "name":
+      return m.fullName.toLowerCase();
+    case "status":
+      return m.status;
+    case "number":
+      return m.memberNumber;
+    case "phone":
+      return m.phone;
+    case "household":
+      return m.household?.name.toLowerCase() ?? null;
+    case "fellowship":
+      return m.fellowship?.name.toLowerCase() ?? null;
+    case "addedBy":
+      return m.createdBy?.fullName.toLowerCase() ?? null;
+    case "gender":
+      return m.gender;
+    case "email":
+      return m.email?.toLowerCase() ?? null;
+    case "address":
+      return m.address?.toLowerCase() ?? null;
+    case "nationality":
+      return m.nationality;
+    case "birthday":
+      return m.birthMonth ? m.birthMonth * 31 + (m.birthDay ?? 0) : null;
+    case "maritalStatus":
+      return m.maritalStatus;
+    case "workingStatus":
+      return m.workingStatus;
+    case "student":
+      return m.isStudent ? 1 : 0;
+    case "joinedAt":
+      return m.joinedAt;
+  }
+}
+
+/** Nulls sort last regardless of direction -- flipping asc/desc shouldn't
+ * shuffle "no data yet" rows to the top. */
+function compareMembers(a: MemberDto, b: MemberDto, key: SortKey, dir: "asc" | "desc"): number {
+  const av = sortValue(a, key);
+  const bv = sortValue(b, key);
+  if (av === null && bv === null) return 0;
+  if (av === null) return 1;
+  if (bv === null) return -1;
+  const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+  return dir === "asc" ? cmp : -cmp;
+}
+
+function SortableTh({
+  label,
+  sortKey: key,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey | null;
+  dir: "asc" | "desc";
+  onSort: (key: SortKey) => void;
+}) {
+  const active = activeKey === key;
+  return (
+    <th className="text-left font-medium px-4 py-2">
+      <button
+        type="button"
+        onClick={() => onSort(key)}
+        className="flex items-center gap-1"
+        style={{ color: active ? "var(--ink)" : "var(--ink-muted)" }}
+      >
+        {label}
+        <span style={{ fontSize: "0.6rem", opacity: active ? 1 : 0.35 }}>{active && dir === "desc" ? "▼" : "▲"}</span>
+      </button>
+    </th>
+  );
+}
 
 const STATUS_LABELS: Record<MemberStatus, string> = {
   VISITOR: "Visitor",
@@ -102,6 +205,8 @@ export function MembersPage() {
       return DEFAULT_VISIBLE_COLUMNS;
     }
   });
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showForm, setShowForm] = useState(false);
   const [fullName, setFullName] = useState("");
   const [memberNumber, setMemberNumber] = useState("");
@@ -369,12 +474,25 @@ export function MembersPage() {
     setShowForm(false);
   }
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
   const filteredMembers = members.filter((m) => {
     if (statusFilter && m.status !== statusFilter) return false;
     if (joinedFrom && (!m.joinedAt || m.joinedAt < joinedFrom)) return false;
     if (joinedTo && (!m.joinedAt || m.joinedAt.slice(0, 10) > joinedTo)) return false;
     return true;
   });
+
+  const sortedMembers = sortKey
+    ? [...filteredMembers].sort((a, b) => compareMembers(a, b, sortKey, sortDir))
+    : filteredMembers;
 
   return (
     <div>
@@ -392,7 +510,7 @@ export function MembersPage() {
             </button>
             {showColumnsMenu && (
               <div
-                className="absolute right-0 mt-1 w-48 rounded-md border shadow-lg z-10 p-2"
+                className="absolute right-0 mt-1 w-56 max-h-80 overflow-y-auto rounded-md border shadow-lg z-10 p-2"
                 style={{ borderColor: "var(--line)", background: "var(--surface)" }}
               >
                 {(Object.entries(ALL_COLUMNS) as [ColumnKey, string][]).map(([key, label]) => (
@@ -916,18 +1034,27 @@ export function MembersPage() {
           <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--line)" }}>
-                <th className="text-left font-medium px-4 py-2">Name</th>
-                <th className="text-left font-medium px-4 py-2">Status</th>
-                {visibleColumns.number && <th className="text-left font-medium px-4 py-2">Number</th>}
-                {visibleColumns.phone && <th className="text-left font-medium px-4 py-2">Phone</th>}
-                {visibleColumns.household && <th className="text-left font-medium px-4 py-2">{terms.household}</th>}
-                {visibleColumns.fellowship && <th className="text-left font-medium px-4 py-2">{terms.fellowship}</th>}
-                {visibleColumns.addedBy && <th className="text-left font-medium px-4 py-2">Added by</th>}
+                <SortableTh label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                {visibleColumns.number && <SortableTh label="Number" sortKey="number" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.phone && <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.household && <SortableTh label={terms.household} sortKey="household" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.fellowship && <SortableTh label={terms.fellowship} sortKey="fellowship" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.addedBy && <SortableTh label="Added by" sortKey="addedBy" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.gender && <SortableTh label="Gender" sortKey="gender" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.email && <SortableTh label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.address && <SortableTh label="Address" sortKey="address" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.nationality && <SortableTh label="Nationality" sortKey="nationality" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.birthday && <SortableTh label="Birthday" sortKey="birthday" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.maritalStatus && <SortableTh label="Marital status" sortKey="maritalStatus" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.workingStatus && <SortableTh label="Working status" sortKey="workingStatus" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.student && <SortableTh label="Student" sortKey="student" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
+                {visibleColumns.joinedAt && <SortableTh label="Joined" sortKey="joinedAt" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />}
                 <th className="text-right font-medium px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredMembers.map((m) => (
+              {sortedMembers.map((m) => (
                 <tr key={m.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                   <td className="px-4 py-2.5">
                     <button type="button" onClick={() => openMember(m, "view")} className="text-left font-medium underline decoration-dotted" style={{ color: "var(--ink)" }}>
@@ -967,6 +1094,51 @@ export function MembersPage() {
                   {visibleColumns.addedBy && (
                     <td className="px-4 py-2.5" style={{ color: m.createdBy ? "var(--ink)" : "var(--ink-muted)" }}>
                       {m.createdBy?.fullName ?? "—"}
+                    </td>
+                  )}
+                  {visibleColumns.gender && (
+                    <td className="px-4 py-2.5" style={{ color: m.gender ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.gender ? GENDER_LABELS[m.gender] : "—"}
+                    </td>
+                  )}
+                  {visibleColumns.email && (
+                    <td className="px-4 py-2.5" style={{ color: m.email ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.email || "—"}
+                    </td>
+                  )}
+                  {visibleColumns.address && (
+                    <td className="px-4 py-2.5" style={{ color: m.address ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.address || "—"}
+                    </td>
+                  )}
+                  {visibleColumns.nationality && (
+                    <td className="px-4 py-2.5" style={{ color: m.nationality ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.nationality || "—"}
+                    </td>
+                  )}
+                  {visibleColumns.birthday && (
+                    <td className="px-4 py-2.5" style={{ color: m.birthMonth ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.birthMonth ? `${MONTHS[m.birthMonth - 1]} ${m.birthDay ?? ""}${m.birthYear ? `, ${m.birthYear}` : ""}` : "—"}
+                    </td>
+                  )}
+                  {visibleColumns.maritalStatus && (
+                    <td className="px-4 py-2.5" style={{ color: m.maritalStatus ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.maritalStatus ? MARITAL_LABELS[m.maritalStatus] : "—"}
+                    </td>
+                  )}
+                  {visibleColumns.workingStatus && (
+                    <td className="px-4 py-2.5" style={{ color: m.workingStatus ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.workingStatus ? WORKING_STATUS_LABELS[m.workingStatus] : "—"}
+                    </td>
+                  )}
+                  {visibleColumns.student && (
+                    <td className="px-4 py-2.5" style={{ color: m.isStudent ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.isStudent ? m.school || "Yes" : "No"}
+                    </td>
+                  )}
+                  {visibleColumns.joinedAt && (
+                    <td className="px-4 py-2.5" style={{ color: m.joinedAt ? "var(--ink)" : "var(--ink-muted)" }}>
+                      {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—"}
                     </td>
                   )}
                   <td className="px-4 py-2.5">
