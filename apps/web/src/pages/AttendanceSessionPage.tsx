@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from "qrcode";
-import { MemberStatus, type AttendanceRecordDto, type AttendanceSessionDto, type FellowshipDto, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
+import { COUNTRIES, MemberStatus, type AttendanceRecordDto, type AttendanceSessionDto, type FellowshipDto, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
+import { useOrg } from "../context/OrgContext";
 import { IconButton, LinkIcon, TrashIcon, UserPlusIcon } from "../components/icons";
 import { MemberDialog } from "../components/MemberDialog";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
@@ -48,6 +49,8 @@ function blankMemberFor(visitorName: string, visitorPhone: string | null): Membe
 
 export function AttendanceSessionPage() {
   const { id } = useParams<{ id: string }>();
+  const { org } = useOrg();
+  const orgDialCode = COUNTRIES.find((c) => c.name === org?.country)?.dialCode ?? "";
   const [session, setSession] = useState<AttendanceSessionDto | null>(null);
   const [records, setRecords] = useState<AttendanceRecordDto[]>([]);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -76,6 +79,15 @@ export function AttendanceSessionPage() {
     [records],
   );
   const visitorNameTaken = visitorName.trim().length > 0 && checkedInVisitorNames.has(visitorName.trim().toLowerCase());
+
+  // useOrg() resolves asynchronously (its own fetch on app mount), so this
+  // can't be a useState initializer -- on a fresh page load org is still
+  // null on first render. Only fills in while the field is untouched, so it
+  // never overwrites a code the user already picked.
+  useEffect(() => {
+    if (orgDialCode && !visitorPhone) setVisitorPhone(`${orgDialCode} `);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgDialCode]);
 
   async function loadSession() {
     if (!id) return;
@@ -151,7 +163,7 @@ export function AttendanceSessionPage() {
       payload: { id: recordId, visitorName: name, visitorPhone: phone ?? undefined },
     });
     setVisitorName("");
-    setVisitorPhone("");
+    setVisitorPhone(orgDialCode ? `${orgDialCode} ` : "");
   }
 
   async function deleteRecord(record: AttendanceRecordDto) {

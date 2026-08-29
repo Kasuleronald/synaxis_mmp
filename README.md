@@ -2,7 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-29 (3) (Service unit attendance chart redrawn as grouped vertical bars -- see the newest section right below)
+**Last updated:** 2026-08-29 (4) (Spouse-picker dropdown no longer clipped; walk-in phone defaults to the org's country code -- see the newest section right below)
+
+## 2026-08-29 (4) — Spouse-picker dropdown fix, walk-in phone country-code default
+
+- **The spouse (and every other member-search) dropdown no longer gets clipped** -- inside the member edit dialog specifically, its results list could get cut off by the dialog's own scroll boundary. The searchable member picker now renders its dropdown outside that boundary entirely, so this can't happen anywhere it's used.
+- **Walk-in phone numbers default to your org's country code** -- both the staff-side manual check-in and the public self check-in page now prefill the phone field with your Settings' default country's dial code (e.g. "+256 "); type over it if the person's number uses a different one.
 
 ## 2026-08-29 (3) — Service unit attendance chart, redrawn
 

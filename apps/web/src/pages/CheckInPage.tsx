@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { MemberDto, OrganizationDto } from "@life-mmp/shared";
+import { COUNTRIES, type MemberDto, type OrganizationDto } from "@life-mmp/shared";
 import { api } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
@@ -12,7 +12,7 @@ import { enqueue } from "../lib/sync";
  */
 export function CheckInPage() {
   const { token } = useParams<{ token: string }>();
-  const [org, setOrg] = useState<Pick<OrganizationDto, "displayName" | "logoUrl" | "theme"> | null>(null);
+  const [org, setOrg] = useState<Pick<OrganizationDto, "displayName" | "logoUrl" | "theme" | "country"> | null>(null);
   const [sessionName, setSessionName] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<MemberDto[]>([]);
@@ -20,6 +20,17 @@ export function CheckInPage() {
   const [visitorPhone, setVisitorPhone] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // No signed-in useOrg() here (this route is public) -- the org's default
+  // country only becomes known once the check-in info loads, so the dial
+  // code fills in then rather than at first render; it never overwrites
+  // whatever the visitor's already typed.
+  useEffect(() => {
+    if (!org?.country || visitorPhone) return;
+    const dialCode = COUNTRIES.find((c) => c.name === org.country)?.dialCode;
+    if (dialCode) setVisitorPhone(`${dialCode} `);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org]);
 
   const cacheKey = `checkin:${token}`;
 
@@ -35,7 +46,10 @@ export function CheckInPage() {
     if (!token) return;
     (async () => {
       try {
-        const info = await api.get<{ session: { name: string }; organization: OrganizationDto }>(`/checkin/${token}`);
+        const info = await api.get<{
+          session: { name: string };
+          organization: Pick<OrganizationDto, "displayName" | "logoUrl" | "theme" | "country">;
+        }>(`/checkin/${token}`);
         setSessionName(info.session.name);
         setOrg(info.organization);
         localStorage.setItem(cacheKey, JSON.stringify({ sessionName: info.session.name, org: info.organization }));
@@ -83,7 +97,8 @@ export function CheckInPage() {
     setSearch("");
     setResults([]);
     setVisitorName("");
-    setVisitorPhone("");
+    const dialCode = org?.country ? COUNTRIES.find((c) => c.name === org.country)?.dialCode : undefined;
+    setVisitorPhone(dialCode ? `${dialCode} ` : "");
   }
 
   if (error) {

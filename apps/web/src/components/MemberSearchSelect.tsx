@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { MemberDto } from "@life-mmp/shared";
 
 /** A searchable stand-in for `<select>` over the full members list -- a
@@ -21,17 +22,40 @@ export function MemberSearchSelect({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selected = members.find((m) => m.id === value) ?? null;
 
+  function updatePosition() {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }
+
+  // Portaled to <body> and positioned `fixed` off the input's own
+  // coordinates -- an `absolute` dropdown gets clipped the moment it's used
+  // inside anything scrollable (a modal dialog's own overflow-y-auto body,
+  // a bordered list wrapper), which a plain sibling `absolute` can't escape.
   useEffect(() => {
     if (!open) return;
+    updatePosition();
     function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside, true);
-    return () => document.removeEventListener("mousedown", onClickOutside, true);
+    document.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside, true);
+      document.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
   }, [open]);
 
   const q = query.trim().toLowerCase();
@@ -64,46 +88,49 @@ export function MemberSearchSelect({
           ✕
         </button>
       )}
-      {open && (
-        <div
-          className="absolute z-10 mt-1 w-full rounded-md border shadow-lg max-h-56 overflow-y-auto"
-          style={{ borderColor: "var(--line)", background: "var(--surface)" }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setOpen(false);
-              setQuery("");
-            }}
-            className="block w-full text-left px-3 py-2 text-sm"
-            style={{ color: "var(--ink-muted)" }}
+      {open &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[100] mt-0 rounded-md border shadow-lg max-h-56 overflow-y-auto"
+            style={{ top: coords.top, left: coords.left, width: coords.width, borderColor: "var(--line)", background: "var(--surface)" }}
           >
-            {emptyLabel}
-          </button>
-          {results.map((m) => (
             <button
-              key={m.id}
               type="button"
               onClick={() => {
-                onChange(m.id);
+                onChange("");
                 setOpen(false);
                 setQuery("");
               }}
               className="block w-full text-left px-3 py-2 text-sm"
-              style={{ color: "var(--ink)" }}
+              style={{ color: "var(--ink-muted)" }}
             >
-              {m.fullName}
-              {m.memberNumber ? ` (${m.memberNumber})` : ""}
+              {emptyLabel}
             </button>
-          ))}
-          {results.length === 0 && (
-            <div className="px-3 py-2 text-sm" style={{ color: "var(--ink-muted)" }}>
-              No matches
-            </div>
-          )}
-        </div>
-      )}
+            {results.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onChange(m.id);
+                  setOpen(false);
+                  setQuery("");
+                }}
+                className="block w-full text-left px-3 py-2 text-sm"
+                style={{ color: "var(--ink)" }}
+              >
+                {m.fullName}
+                {m.memberNumber ? ` (${m.memberNumber})` : ""}
+              </button>
+            ))}
+            {results.length === 0 && (
+              <div className="px-3 py-2 text-sm" style={{ color: "var(--ink-muted)" }}>
+                No matches
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

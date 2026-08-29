@@ -131,7 +131,7 @@ export class AttendanceService {
       (tx) =>
         tx.organization.findUnique({
           where: { id: session.organizationId },
-          select: { displayName: true, logoUrl: true, theme: true },
+          select: { displayName: true, logoUrl: true, theme: true, country: true },
         }),
     );
     return { session, organization };
