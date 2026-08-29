@@ -33,6 +33,7 @@ import { TestimoniesModule } from "./testimonies/testimonies.module";
 import { DevotionalsModule } from "./devotionals/devotionals.module";
 import { SoulWinningModule } from "./soul-winning/soul-winning.module";
 import { ServiceUnitsModule } from "./service-units/service-units.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { ServiceUnitsModule } from "./service-units/service-units.module";
     DevotionalsModule,
     SoulWinningModule,
     ServiceUnitsModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
 })

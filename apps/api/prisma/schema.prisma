@@ -104,6 +104,7 @@ model Organization {
   devotionals            Devotional[]
   soulWinningRecords     SoulWinningRecord[]
   serviceUnits           ServiceUnit[]
+  auditLogs              AuditLog[]
 
   // Optional lightweight display-only currency toggle for finance screens --
   // recomputes *displayed* amounts using this admin-set rate, never touches
@@ -206,6 +207,7 @@ model User {
   assetsUploaded           Asset[]            @relation("AssetUploadedBy")
   fixedAssetsAdded         FixedAsset[]       @relation("FixedAssetAddedBy")
   pledgesCreated           Pledge[]           @relation("PledgeCreatedBy")
+  auditLogs                AuditLog[]         @relation("AuditLogActor")
   conditionRequestsMade    AssetConditionRequest[] @relation("ConditionRequestedBy")
   conditionRequestsAnswered AssetConditionRequest[] @relation("ConditionRespondedBy")
   fixedAssetEditRequestsMade     FixedAssetEditRequest[] @relation("FixedAssetEditRequestedBy")
@@ -1002,6 +1004,37 @@ model Notification {
   @@index([organizationId])
   @@index([userId])
   @@map("notifications")
+}
+
+/// One row per significant action -- login, a create/update/delete, an
+/// approval or rejection -- across the whole app. `actorName`/`actorRole`
+/// are snapshots taken at the time (an actor's own edits or a later name
+/// change must never rewrite history), same reasoning as GivingRecord's
+/// recordedBy pairing a live FK with data that has to survive it going null.
+/// `organizationId` is null only for a Platform Administrator's own login
+/// (they have no organization) -- everything else is org-scoped, read
+/// through the same platform-admin-bypass RLS shape as users/organizations/
+/// branches, since the Platform Admin console's login audit is the one
+/// place that legitimately needs to see across every org at once.
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          User?    @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName      String
+  actorRole      String?
+  action         String
+  entityType     String?
+  entityId       String?
+  entityLabel    String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 /// A record of one broadcast -- who sent it, to how many people, and what
