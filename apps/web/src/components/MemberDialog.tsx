@@ -145,6 +145,19 @@ export function MemberDialog({ member: initial, members, households, fellowships
   const [error, setError] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
 
+  // Already sharing a household as Head/Spouse -- the link is established,
+  // so re-prompting "is your spouse already a member" is just noise.
+  const currentSpouse =
+    member.householdId && (member.householdRole === HouseholdRole.HEAD || member.householdRole === HouseholdRole.SPOUSE)
+      ? (members?.find(
+          (m) =>
+            m.id !== member.id &&
+            m.householdId === member.householdId &&
+            ((member.householdRole === HouseholdRole.HEAD && m.householdRole === HouseholdRole.SPOUSE) ||
+              (member.householdRole === HouseholdRole.SPOUSE && m.householdRole === HouseholdRole.HEAD)),
+        ) ?? null)
+      : null;
+
   useEffect(() => {
     // Escape closes the dialog, matching normal modal behavior.
     function onKey(e: KeyboardEvent) {
@@ -450,7 +463,12 @@ export function MemberDialog({ member: initial, members, households, fellowships
                   </select>
                 </div>
               )}
-              {maritalStatus === MaritalStatus.MARRIED && members && members.length > 0 && (
+              {maritalStatus === MaritalStatus.MARRIED && currentSpouse && (
+                <div className="sm:col-span-2 text-sm" style={{ color: "var(--ink-muted)" }}>
+                  Married to <span style={{ color: "var(--ink)" }}>{currentSpouse.fullName}</span>
+                </div>
+              )}
+              {maritalStatus === MaritalStatus.MARRIED && !currentSpouse && members && members.length > 0 && (
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm mb-1">
                     <input

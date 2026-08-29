@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { HouseholdDto, MemberDto } from "@life-mmp/shared";
+import { HouseholdRole, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { ConfirmCreatePreview } from "../components/ConfirmCreatePreview";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
@@ -23,6 +23,7 @@ export function HouseholdsPage() {
   const [editAddress, setEditAddress] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<Record<string, string>>({});
+  const [couplesOnly, setCouplesOnly] = useState(false);
 
   async function load() {
     const [h, m] = await Promise.all([
@@ -93,9 +94,24 @@ export function HouseholdsPage() {
     }
   }
 
+  // Spouse per household -- households already carry a head, but not the
+  // rest of the roster, so "who's the couple" is read off the members list
+  // instead (each member already knows its own householdId/householdRole).
+  const spouseByHousehold = new Map<string, MemberDto>();
+  for (const m of members) {
+    if (m.householdId && m.householdRole === HouseholdRole.SPOUSE) spouseByHousehold.set(m.householdId, m);
+  }
+  const visibleHouseholds = couplesOnly ? households.filter((h) => spouseByHousehold.has(h.id)) : households;
+
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold mb-1">{terms.household}</h1>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <h1 className="text-xl font-semibold">{terms.household}</h1>
+        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--ink-muted)" }}>
+          <input type="checkbox" checked={couplesOnly} onChange={(e) => setCouplesOnly(e.target.checked)} />
+          Couples only
+        </label>
+      </div>
       <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
         Family units -- pick a head here, or a member can join one from their own profile instead.
       </p>
@@ -162,12 +178,12 @@ export function HouseholdsPage() {
       )}
 
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
-        {households.length === 0 && (
+        {visibleHouseholds.length === 0 && (
           <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
-            No households yet.
+            {couplesOnly ? "No couples linked yet." : "No households yet."}
           </div>
         )}
-        {households.map((h) => {
+        {visibleHouseholds.map((h) => {
           const isEditing = editingId === h.id;
           const isDeleting = deletingId === h.id;
           return (
@@ -187,7 +203,14 @@ export function HouseholdsPage() {
                   <div>
                     <div>{h.name}</div>
                     <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
-                      {[h.head?.fullName, h.address].filter(Boolean).join(" · ") || "No head or address set"}
+                      {[
+                        spouseByHousehold.has(h.id) && h.head
+                          ? `${h.head.fullName} & ${spouseByHousehold.get(h.id)!.fullName}`
+                          : h.head?.fullName,
+                        h.address,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "No head or address set"}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

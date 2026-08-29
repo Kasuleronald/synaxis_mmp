@@ -2,7 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-29 (Members: more columns + sortable headers -- see the newest section right below)
+**Last updated:** 2026-08-29 (2) (No repeat spouse-linking prompt, couples visible on Households -- see the newest section right below)
+
+## 2026-08-29 (2) — No repeat spouse-linking prompt, couples on Households
+
+- **No more re-linking a spouse that's already linked** -- once two members are linked (either one's edit form), the other no longer sees "Spouse is already a church member -- link them" again; it shows "Married to {name}" instead. Fixed a real staleness bug along the way: linking a spouse updates both records server-side, but the Members list only ever refreshed the one you were editing, so the other person's household data could go stale in memory until the next full reload -- edits now always reload the list, not just patch the one record.
+- **Households page can show just couples** -- a "Couples only" checkbox filters the list down to households with both a Head and a Spouse linked, and the household line now names both of them (not just the head), so a couple is identifiable at a glance.
 
 ## 2026-08-29 — More Members columns, sortable headers
 

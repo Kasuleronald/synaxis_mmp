@@ -18,7 +18,7 @@ If you forget your password, ask your Org Admin (or, if you are the Org Admin, a
 The list of everyone connected to your church. A visitor and a full member are the same record at different stages — someone becomes a member by changing their **status**, not by moving to a different screen. Add a member with name, phone, and address required at minimum; everything else (gender, birthday, marital/working status, nationality, leadership roles, household, fellowship) is optional. Search by name or phone, filter by status or joined date, click any column header to sort by it, customize which columns show (gender, email, address, nationality, birthday, marital/working status, student, joined date — off by default, turn on what you need from the Columns menu), and export the list to Excel or PDF.
 
 ### Households
-Group members who live together — a household has a head and any number of other members with a role (spouse, child, dependent). Address auto-fills from the head's own profile.
+Group members who live together — a household has a head and any number of other members with a role (spouse, child, dependent). Address auto-fills from the head's own profile. Check "Couples only" to see just the households with both a head and a linked spouse.
 
 ### Follow-up
 Log a note (with an outcome once it's resolved) against any member, and assign someone to follow up with them.

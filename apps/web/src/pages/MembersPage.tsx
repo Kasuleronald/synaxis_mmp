@@ -1167,8 +1167,12 @@ export function MembersPage() {
           initialMode={dialogMode}
           onClose={() => setSelected(null)}
           onChange={(updated) => {
-            setMembers((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
             setSelected(updated);
+            // Full reload, not a local patch -- linking a spouse also
+            // updates THEIR household fields server-side, and a patch here
+            // only ever touches the one record being edited, leaving the
+            // spouse's entry stale until the next full fetch.
+            load();
           }}
         />
       )}
