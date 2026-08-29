@@ -2,7 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-27 (Cross-unit service attendance chart in Reports -- see the newest section right below)
+**Last updated:** 2026-08-29 (Members: more columns + sortable headers -- see the newest section right below)
+
+## 2026-08-29 — More Members columns, sortable headers
+
+- **Members list has more columns to turn on** -- gender, email, address, nationality, birthday, marital status, working status, student, and joined date can now show as columns (off by default, so existing tables don't get wider overnight -- turn them on from the Columns menu).
+- **Every column header now sorts** -- click to sort ascending, click again for descending. There was no way to sort the list at all before.
 
 ## 2026-08-27 (3) — Cross-unit service attendance chart
 
