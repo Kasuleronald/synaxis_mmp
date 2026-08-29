@@ -2,7 +2,11 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-29 (2) (No repeat spouse-linking prompt, couples visible on Households -- see the newest section right below)
+**Last updated:** 2026-08-29 (3) (Service unit attendance chart redrawn as grouped vertical bars -- see the newest section right below)
+
+## 2026-08-29 (3) — Service unit attendance chart, redrawn
+
+- **Reports -> Service units is now grouped vertical bars, not horizontal ones** -- a Present column and an Absent column side by side per service unit, with an axis, gridlines, and the count labeled right on each bar (in the bar for a tall one, just above it for a short one). Matches the mockup style you pointed to instead of the earlier sideways layout.
 
 ## 2026-08-29 (2) — No repeat spouse-linking prompt, couples on Households
 

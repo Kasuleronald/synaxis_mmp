@@ -419,14 +419,60 @@ function AttendanceListsTab() {
   );
 }
 
-/** Present/absent stacked per service unit, for one chosen service --
- * fixed status colors (never the org's accent theme), bar length scaled to
- * relative unit size so both headcount and turnout rate read at a glance.
- * Red/green fails the colorblind-separation check by nature of being a
- * status pair (see palette.md), so every value is also a plain-text direct
- * label -- never color-alone -- and a table view sits underneath. */
+const BAR_AREA_HEIGHT = 200;
+const BAR_WIDTH = 22;
+
+/** ~5 gridlines at a clean step (1/2/5/10/20/25/50/100...), same rule the
+ * marks spec asks for on any axis ("round to clean numbers"). */
+function niceAxisTicks(maxValue: number): number[] {
+  const roughStep = Math.max(maxValue, 1) / 5;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const rawStep = [1, 2, 5, 10].map((m) => m * magnitude).find((c) => roughStep <= c) ?? 10 * magnitude;
+  // Attendance counts are whole people -- a "1.5" gridline never makes sense.
+  const step = Math.max(1, Math.round(rawStep));
+  const ceiling = Math.max(Math.ceil(maxValue / step) * step, step);
+  const ticks: number[] = [];
+  for (let t = 0; t <= ceiling; t += step) ticks.push(t);
+  return ticks;
+}
+
+/** A single column -- label sits inside near the top when the bar is tall
+ * enough to hold it with padding, otherwise above the bar (never clipped),
+ * matching the "measure first" rule for in-mark labels. */
+function GroupedColumn({ value, axisMax, color, title }: { value: number; axisMax: number; color: string; title: string }) {
+  const pxHeight = axisMax > 0 ? (value / axisMax) * BAR_AREA_HEIGHT : 0;
+  const labelFits = pxHeight >= 26;
+  return (
+    <div className="flex flex-col items-center justify-end" style={{ height: BAR_AREA_HEIGHT, width: BAR_WIDTH }}>
+      {!labelFits && (
+        <div className="text-xs font-semibold mb-0.5" style={{ color: "var(--ink)" }}>
+          {value}
+        </div>
+      )}
+      <div
+        title={title}
+        className="w-full flex justify-center transition-opacity hover:opacity-85"
+        style={{ height: Math.max(pxHeight, value > 0 ? 2 : 0), background: color, borderRadius: "4px 4px 0 0" }}
+      >
+        {labelFits && (
+          <span className="text-xs font-semibold mt-1" style={{ color: "white" }}>
+            {value}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Present/absent as two grouped columns per service unit, for one chosen
+ * service -- fixed status colors (never the org's accent theme). Red/green
+ * fails the colorblind-separation check by nature of being a status pair
+ * (see palette.md), so every value is also a plain-text direct label --
+ * never color-alone -- and a table view sits underneath. */
 function ServiceUnitAttendanceChart({ rows }: { rows: ServiceUnitAttendanceReportRow[] }) {
-  const maxTotal = Math.max(1, ...rows.map((r) => r.total));
+  const maxValue = Math.max(1, ...rows.flatMap((r) => [r.present, r.absent]));
+  const ticks = niceAxisTicks(maxValue);
+  const axisMax = ticks[ticks.length - 1];
 
   return (
     <div>
@@ -441,43 +487,43 @@ function ServiceUnitAttendanceChart({ rows }: { rows: ServiceUnitAttendanceRepor
         </span>
       </div>
 
-      <div className="grid gap-3 mb-4">
-        {rows.map((r) => {
-          const barWidthPct = (r.total / maxTotal) * 100;
-          const presentShare = r.total > 0 ? (r.present / r.total) * 100 : 0;
-          const absentShare = r.total > 0 ? (r.absent / r.total) * 100 : 0;
-          return (
-            <div key={r.unitId}>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-medium">{r.unitName}</span>
-                <span style={{ color: "var(--ink-muted)" }}>
-                  {r.total === 0 ? "No members" : `${r.present}/${r.total} present`}
-                </span>
-              </div>
-              {r.total > 0 && (
-                <div style={{ width: `${barWidthPct}%`, minWidth: "3rem" }}>
-                  <div className="flex h-2.5 overflow-hidden" style={{ background: "var(--surface)", borderRadius: "0 4px 4px 0" }}>
-                    {r.present > 0 && (
-                      <div
-                        title={`${r.unitName} -- Present: ${r.present}`}
-                        className="h-full transition-opacity hover:opacity-80"
-                        style={{ width: `${presentShare}%`, background: "var(--status-good)" }}
-                      />
-                    )}
-                    {r.present > 0 && r.absent > 0 && <div style={{ width: 2, background: "var(--surface)" }} />}
-                    {r.absent > 0 && (
-                      <div
-                        title={`${r.unitName} -- Absent: ${r.absent}`}
-                        className="h-full transition-opacity hover:opacity-80"
-                        style={{ width: `${absentShare}%`, background: "var(--status-critical)" }}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
+      <div className="overflow-x-auto mb-4">
+        <div className="flex" style={{ minWidth: rows.length * 84 + 32 }}>
+          <div
+            className="flex flex-col-reverse justify-between text-xs pr-2 shrink-0"
+            style={{ height: BAR_AREA_HEIGHT, color: "var(--ink-muted)" }}
+          >
+            {ticks.map((t) => (
+              <div key={t}>{t}</div>
+            ))}
+          </div>
+          <div className="relative flex-1">
+            <div className="absolute inset-0 flex flex-col-reverse justify-between pointer-events-none">
+              {ticks.map((t) => (
+                <div key={t} style={{ borderTop: "1px solid var(--line)" }} />
+              ))}
             </div>
-          );
-        })}
+            <div className="relative flex items-end gap-6 px-3" style={{ height: BAR_AREA_HEIGHT }}>
+              {rows.map((r) => (
+                <div key={r.unitId} className="flex items-end gap-1.5 shrink-0">
+                  <GroupedColumn value={r.present} axisMax={axisMax} color="var(--status-good)" title={`${r.unitName} -- Present: ${r.present}`} />
+                  <GroupedColumn value={r.absent} axisMax={axisMax} color="var(--status-critical)" title={`${r.unitName} -- Absent: ${r.absent}`} />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-6 px-3 mt-1.5">
+              {rows.map((r) => (
+                <div
+                  key={r.unitId}
+                  className="text-xs text-center shrink-0"
+                  style={{ color: "var(--ink-muted)", width: BAR_WIDTH * 2 + 6 }}
+                >
+                  {r.unitName}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <details>
