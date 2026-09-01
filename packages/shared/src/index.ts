@@ -1160,6 +1160,23 @@ export interface ServiceUnitAttendanceReportDto {
   units: ServiceUnitAttendanceReportRow[];
 }
 
+export interface AuditLogEntryDto {
+  id: string;
+  organizationId: string | null;
+  actorId: string | null;
+  actorName: string;
+  actorRole: string | null;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  entityLabel: string | null;
+  createdAt: string;
+}
+
+export interface LoginAuditEntryDto extends AuditLogEntryDto {
+  organizationName: string | null;
+}
+
 export interface NotificationDto {
   id: string;
   type: string;

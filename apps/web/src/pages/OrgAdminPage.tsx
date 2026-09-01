@@ -1,8 +1,88 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
+import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type AuditLogEntryDto, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 import { useTerminology } from "../hooks/useTerminology";
+
+function humanizeAction(action: string): string {
+  return action.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function AuditLogSection() {
+  const [rows, setRows] = useState<AuditLogEntryDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    api
+      .get<AuditLogEntryDto[]>("/audit-log")
+      .then(setRows)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter(
+        (r) =>
+          r.actorName.toLowerCase().includes(q) ||
+          humanizeAction(r.action).toLowerCase().includes(q) ||
+          (r.entityLabel ?? "").toLowerCase().includes(q),
+      )
+    : rows;
+
+  return (
+    <section>
+      <h1 className="text-xl font-semibold mb-1">Audit log</h1>
+      <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
+        Logins, deletions, approvals, and most create/update actions across your organization, most
+        recent first.
+      </p>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search by person, action, or record…"
+        className="w-full max-w-sm rounded-md border px-3 py-2 text-sm mb-4"
+        style={{ borderColor: "var(--line)" }}
+      />
+      <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--line)" }}>
+        {loading ? (
+          <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+            Loading…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+            Nothing recorded yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm min-w-[640px]">
+            <thead>
+              <tr className="text-left border-b" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                <th className="py-2 px-4 font-medium">When</th>
+                <th className="py-2 px-4 font-medium">Who</th>
+                <th className="py-2 px-4 font-medium">Action</th>
+                <th className="py-2 px-4 font-medium">Record</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+                  <td className="py-2 px-4" style={{ color: "var(--ink-muted)" }}>
+                    {new Date(r.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                  </td>
+                  <td className="py-2 px-4 font-medium">{r.actorName}</td>
+                  <td className="py-2 px-4">{humanizeAction(r.action)}</td>
+                  <td className="py-2 px-4" style={{ color: "var(--ink-muted)" }}>
+                    {r.entityLabel ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function OrgAdminPage() {
   const terms = useTerminology();
@@ -606,6 +686,8 @@ export function OrgAdminPage() {
           ))}
         </div>
       </section>
+
+      <AuditLogSection />
     </div>
   );
 }

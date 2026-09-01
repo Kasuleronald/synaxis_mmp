@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (Data backup/restore, audit log, staff branch/role editing, branch deletion -- see the newest section right below)
+**Last updated:** 2026-09-01 (2) (Audit log viewing screens for both Platform Admin and Org Admin -- see the newest section right below)
 
+## 2026-09-01 (2) — Audit log viewing screens
+
+- **Platform Administration has a new "Login audit" tab** -- every login across every organization, most recent first, including Platform Administrators' own, with a search box. Still the only thing a Platform Administrator can see about what happens inside an organization.
+- **Organization Admin has a new "Audit log" section** -- logins, deletions, approvals, and the create/update actions swept so far, most recent first, with a search box. More modules still need to be wired into it (see the audit-log entry two sections up).
 ## 2026-09-01 — Data backup/restore, audit log, staff editing, branch deletion
 
 - **Settings -> Data backup** -- download a complete copy of your organization's data (members, households, fellowships, departments, service units, attendance, giving, pledges, requisitions, assets, and more) as one file, and restore from it if you ever need to. Restoring replaces your organization's current data with what's in the file -- worth doing before a major update or a hosting/storage change, and there for the rare case of actual data loss, not everyday use. Every export and restore is itself logged.

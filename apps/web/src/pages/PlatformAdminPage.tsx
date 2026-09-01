@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Theme, type OrganizationDto } from "@life-mmp/shared";
+import { Theme, type LoginAuditEntryDto, type OrganizationDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { PasswordInput } from "../components/PasswordInput";
 import { OrganizationDialog } from "../components/OrganizationDialog";
@@ -12,7 +12,84 @@ function slugify(input: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function LoginAuditTab() {
+  const [rows, setRows] = useState<LoginAuditEntryDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    api
+      .get<LoginAuditEntryDto[]>("/audit-log/logins")
+      .then(setRows)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter(
+        (r) =>
+          r.actorName.toLowerCase().includes(q) ||
+          (r.organizationName ?? "").toLowerCase().includes(q),
+      )
+    : rows;
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
+        Every login across every organization, most recent first -- including Platform
+        Administrators' own. This is the one place a Platform Administrator sees anything that
+        happened inside an organization; nothing about members, giving, or pastoral data is visible
+        here or anywhere else.
+      </p>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search by person or organization…"
+        className="w-full max-w-sm rounded-md border px-3 py-2 text-sm mb-4"
+        style={{ borderColor: "var(--line)" }}
+      />
+      <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--line)" }}>
+        {loading ? (
+          <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+            Loading…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+            No logins recorded yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm min-w-[560px]">
+            <thead>
+              <tr className="text-left border-b" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                <th className="py-2 px-4 font-medium">When</th>
+                <th className="py-2 px-4 font-medium">Who</th>
+                <th className="py-2 px-4 font-medium">Role</th>
+                <th className="py-2 px-4 font-medium">Organization</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+                  <td className="py-2 px-4" style={{ color: "var(--ink-muted)" }}>
+                    {new Date(r.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                  </td>
+                  <td className="py-2 px-4 font-medium">{r.actorName}</td>
+                  <td className="py-2 px-4" style={{ color: "var(--ink-muted)" }}>
+                    {r.actorRole ? r.actorRole.replace(/_/g, " ").toLowerCase() : "—"}
+                  </td>
+                  <td className="py-2 px-4">{r.organizationName ?? "— (Platform Administrator)"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PlatformAdminPage() {
+  const [tab, setTab] = useState<"organizations" | "logins">("organizations");
   const [orgs, setOrgs] = useState<OrganizationDto[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -87,14 +164,16 @@ export function PlatformAdminPage() {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-xl font-semibold">Platform Administration</h1>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="rounded-md px-3 py-1.5 text-sm font-medium"
-          style={{ background: "var(--accent)", color: "white" }}
-        >
-          + Add organization
-        </button>
+        {tab === "organizations" && (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="rounded-md px-3 py-1.5 text-sm font-medium"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            + Add organization
+          </button>
+        )}
       </div>
       <p className="text-sm mb-6" style={{ color: "var(--ink-muted)" }}>
         Create a new church as a tenant and appoint its first Organization Admin. You'll have no
@@ -111,53 +190,81 @@ export function PlatformAdminPage() {
         </div>
       )}
 
-      <h2 className="text-sm font-medium mb-3" style={{ color: "var(--ink-muted)" }}>
-        Organizations ({orgs.length})
-      </h2>
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
-        {orgs.length === 0 && (
-          <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
-            No organizations yet.
-          </div>
-        )}
-        {orgs.map((org) => (
-          <div
-            key={org.id}
-            className="flex items-center justify-between px-4 py-3 border-t first:border-t-0"
-            style={{ borderColor: "var(--line-soft)" }}
+      <div className="flex gap-1 mb-4 border-b" style={{ borderColor: "var(--line)" }}>
+        {(
+          [
+            ["organizations", "Organizations"],
+            ["logins", "Login audit"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setTab(value)}
+            className="px-4 py-2 text-sm font-medium -mb-px border-b-2"
+            style={{
+              borderColor: tab === value ? "var(--accent)" : "transparent",
+              color: tab === value ? "var(--ink)" : "var(--ink-muted)",
+            }}
           >
-            <button type="button" onClick={() => setSelected(org)} className="text-left flex-1">
-              <div className="text-sm font-medium flex items-center gap-2">
-                {org.displayName}
-                {org.isSuspended && (
-                  <span
-                    className="rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
-                  >
-                    Suspended
-                  </span>
-                )}
-              </div>
-              <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
-                {org.slug} · {org.theme.toLowerCase()}
-              </div>
-            </button>
-            <button
-              type="button"
-              disabled={suspendingId === org.id}
-              onClick={() => toggleSuspended(org)}
-              className="rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 shrink-0"
-              style={
-                org.isSuspended
-                  ? { background: "var(--accent)", color: "white" }
-                  : { background: "var(--surface-2)", color: "var(--ink)" }
-              }
-            >
-              {org.isSuspended ? "Reactivate" : "Suspend"}
-            </button>
-          </div>
+            {label}
+          </button>
         ))}
       </div>
+
+      {tab === "logins" && <LoginAuditTab />}
+
+      {tab === "organizations" && (
+        <>
+          <h2 className="text-sm font-medium mb-3" style={{ color: "var(--ink-muted)" }}>
+            Organizations ({orgs.length})
+          </h2>
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
+            {orgs.length === 0 && (
+              <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+                No organizations yet.
+              </div>
+            )}
+            {orgs.map((org) => (
+              <div
+                key={org.id}
+                className="flex items-center justify-between px-4 py-3 border-t first:border-t-0"
+                style={{ borderColor: "var(--line-soft)" }}
+              >
+                <button type="button" onClick={() => setSelected(org)} className="text-left flex-1">
+                  <div className="text-sm font-medium flex items-center gap-2">
+                    {org.displayName}
+                    {org.isSuspended && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+                      >
+                        Suspended
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                    {org.slug} · {org.theme.toLowerCase()}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled={suspendingId === org.id}
+                  onClick={() => toggleSuspended(org)}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 shrink-0"
+                  style={
+                    org.isSuspended
+                      ? { background: "var(--accent)", color: "white" }
+                      : { background: "var(--surface-2)", color: "var(--ink)" }
+                  }
+                >
+                  {org.isSuspended ? "Reactivate" : "Suspend"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {showCreate && (
         <div
