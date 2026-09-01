@@ -22,6 +22,7 @@ import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
 import { exportMembersToExcel, exportMembersToPdf } from "../lib/export";
+import { logExport } from "../lib/auditExport";
 import { MemberDialog } from "../components/MemberDialog";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
@@ -554,6 +555,7 @@ export function MembersPage() {
                   type="button"
                   onClick={() => {
                     exportMembersToExcel(members, org?.displayName ?? "Synaxis MMP");
+                    logExport("Members list (Excel)");
                     setShowExportMenu(false);
                   }}
                   className="block w-full text-left px-3 py-2 text-sm"
@@ -565,6 +567,7 @@ export function MembersPage() {
                   type="button"
                   onClick={() => {
                     exportMembersToPdf(members, org?.displayName ?? "Synaxis MMP", org?.logoUrl);
+                    logExport("Members list (PDF)");
                     setShowExportMenu(false);
                   }}
                   className="block w-full text-left px-3 py-2 text-sm border-t"

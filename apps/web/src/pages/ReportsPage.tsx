@@ -24,6 +24,7 @@ import {
 import { useOrg } from "../context/OrgContext";
 import { api } from "../lib/api";
 import { exportAttendanceToExcel, exportAttendanceToPdf, exportRowsToExcel } from "../lib/export";
+import { logExport } from "../lib/auditExport";
 import { MemberSearchSelect } from "../components/MemberSearchSelect";
 
 function formatMoney(amount: number | string, currency: string) {
@@ -66,7 +67,10 @@ function Card({
         {exportRows && (
           <button
             type="button"
-            onClick={() => exportRowsToExcel(exportRows, title)}
+            onClick={() => {
+              exportRowsToExcel(exportRows, title);
+              logExport(`${title} (Excel)`);
+            }}
             className="text-xs underline shrink-0"
             style={{ color: "var(--accent-ink)" }}
           >
@@ -340,6 +344,7 @@ function AttendanceListsTab() {
       const records = await api.get<AttendanceRecordDto[]>(`/attendance/sessions/${sessionId}/records`);
       if (format === "excel") exportAttendanceToExcel(records, org?.displayName ?? "Synaxis MMP", session.name);
       else exportAttendanceToPdf(records, org?.displayName ?? "Synaxis MMP", session.name, org?.logoUrl);
+      logExport(`Attendance -- ${session.name} (${format === "excel" ? "Excel" : "PDF"})`);
     } finally {
       setDownloading(false);
     }

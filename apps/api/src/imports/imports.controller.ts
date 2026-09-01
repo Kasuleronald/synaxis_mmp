@@ -15,6 +15,7 @@ import type { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { UpdateStagingRowDto } from "./dto/update-staging-row.dto";
 import { ImportsService } from "./imports.service";
 
@@ -27,6 +28,7 @@ export class ImportsController {
 
   @Post()
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_FILE_BYTES } }))
+  @Audit({ action: "IMPORT_STARTED", entityType: "importBatch", labelFields: ["filename"] })
   upload(@CurrentUser() user: SessionUser, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("No file uploaded");
     return this.imports.upload(tenantContextFor(user), file);
@@ -48,6 +50,7 @@ export class ImportsController {
   }
 
   @Post(":id/commit")
+  @Audit({ action: "IMPORT_COMMITTED", entityType: "importBatch" })
   commit(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.imports.commit(tenantContextFor(user), id);
   }

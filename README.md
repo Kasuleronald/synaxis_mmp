@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (2) (Audit log viewing screens for both Platform Admin and Org Admin -- see the newest section right below)
+**Last updated:** 2026-09-01 (3) (Every export and import now shows in the audit log -- see the newest section right below)
 
+## 2026-09-01 (3) — Exports and imports in the audit log
+
+- **Every file export now shows in the audit log** -- the Members list (Excel/PDF), every Reports card's Excel export, and Attendance list downloads (Excel/PDF) all record who exported what, since exports have no backend request of their own to hook into otherwise.
+- **Import Center is tracked too** -- starting an import (the file upload) and committing it (turning staged rows into real records) both show up as their own audit entries.
 ## 2026-09-01 (2) — Audit log viewing screens
 
 - **Platform Administration has a new "Login audit" tab** -- every login across every organization, most recent first, including Platform Administrators' own, with a search box. Still the only thing a Platform Administrator can see about what happens inside an organization.
