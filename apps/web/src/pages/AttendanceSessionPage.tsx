@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from "qrcode";
-import { COUNTRIES, MemberStatus, type AttendanceRecordDto, type AttendanceSessionDto, type FellowshipDto, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
+import { attendanceRecordIsStudent, COUNTRIES, MemberStatus, type AttendanceRecordDto, type AttendanceSessionDto, type FellowshipDto, type HouseholdDto, type MemberDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
@@ -13,7 +13,7 @@ import { MemberSearchSelect } from "../components/MemberSearchSelect";
 /** A blank-slate MemberDto so the full MemberDialog can run in "create" mode
  * prefilled with a walk-in's name/phone -- every other field starts empty,
  * same as a brand-new member would. */
-function blankMemberFor(visitorName: string, visitorPhone: string | null): MemberDto {
+function blankMemberFor(visitorName: string, visitorPhone: string | null, isStudent: boolean | null): MemberDto {
   const now = new Date().toISOString();
   return {
     id: "",
@@ -33,12 +33,13 @@ function blankMemberFor(visitorName: string, visitorPhone: string | null): Membe
     birthYear: null,
     maritalStatus: null,
     workingStatus: null,
-    isStudent: null,
+    isStudent,
     school: null,
     phone: visitorPhone,
     email: null,
     address: null,
     status: MemberStatus.VISITOR,
+    originatedAsWalkIn: true,
     leadershipRoles: [],
     notes: null,
     joinedAt: null,
@@ -58,6 +59,7 @@ export function AttendanceSessionPage() {
   const [results, setResults] = useState<MemberDto[]>([]);
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
+  const [visitorIsStudent, setVisitorIsStudent] = useState(false);
   const [allMembers, setAllMembers] = useState<MemberDto[]>([]);
   const [households, setHouseholds] = useState<HouseholdDto[]>([]);
   const [fellowships, setFellowships] = useState<FellowshipDto[]>([]);
@@ -135,7 +137,16 @@ export function AttendanceSessionPage() {
     if (!id || checkedInMemberIds.has(member.id)) return;
     const recordId = crypto.randomUUID();
     setRecords((r) => [
-      { id: recordId, sessionId: id, memberId: member.id, member: { id: member.id, fullName: member.fullName, phone: member.phone ?? null }, visitorName: null, visitorPhone: null, checkedInAt: new Date().toISOString() },
+      {
+        id: recordId,
+        sessionId: id,
+        memberId: member.id,
+        member: { id: member.id, fullName: member.fullName, phone: member.phone ?? null, isStudent: member.isStudent },
+        visitorName: null,
+        visitorPhone: null,
+        isStudent: null,
+        checkedInAt: new Date().toISOString(),
+      },
       ...r,
     ]);
     await enqueue({
@@ -154,16 +165,18 @@ export function AttendanceSessionPage() {
     const recordId = crypto.randomUUID();
     const name = visitorName.trim();
     const phone = visitorPhone.trim() || null;
-    setRecords((r) => [{ id: recordId, sessionId: id, memberId: null, visitorName: name, visitorPhone: phone, checkedInAt: new Date().toISOString() }, ...r]);
+    const isStudent = visitorIsStudent;
+    setRecords((r) => [{ id: recordId, sessionId: id, memberId: null, visitorName: name, visitorPhone: phone, isStudent, checkedInAt: new Date().toISOString() }, ...r]);
     await enqueue({
       id: recordId,
       entity: "attendanceRecord",
       operation: "create",
       parentId: id,
-      payload: { id: recordId, visitorName: name, visitorPhone: phone ?? undefined },
+      payload: { id: recordId, visitorName: name, visitorPhone: phone ?? undefined, isStudent },
     });
     setVisitorName("");
     setVisitorPhone(orgDialCode ? `${orgDialCode} ` : "");
+    setVisitorIsStudent(false);
   }
 
   async function deleteRecord(record: AttendanceRecordDto) {
@@ -187,7 +200,13 @@ export function AttendanceSessionPage() {
       `/attendance/sessions/${id}/records/${record.id}/link-member`,
       { memberId: member.id },
     );
-    setRecords((r) => r.map((x) => (x.id === record.id ? { ...updated, member: { id: member.id, fullName: member.fullName, phone: member.phone } } : x)));
+    setRecords((r) =>
+      r.map((x) =>
+        x.id === record.id
+          ? { ...updated, member: { id: member.id, fullName: member.fullName, phone: member.phone, isStudent: member.isStudent } }
+          : x,
+      ),
+    );
   }
 
   async function onWalkInPromoted(created: MemberDto) {
@@ -305,6 +324,10 @@ export function AttendanceSessionPage() {
             Check in
           </button>
         </div>
+        <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: "var(--ink-muted)" }}>
+          <input type="checkbox" checked={visitorIsStudent} onChange={(e) => setVisitorIsStudent(e.target.checked)} />
+          Student
+        </label>
         {visitorNameTaken && (
           <p className="text-xs" style={{ color: "var(--danger, #b91c1c)" }}>
             Someone with that name is already checked in to this session.
@@ -313,9 +336,15 @@ export function AttendanceSessionPage() {
       </section>
 
       <section>
-        <h2 className="text-sm font-medium mb-3" style={{ color: "var(--ink-muted)" }}>
+        <h2 className="text-sm font-medium mb-1" style={{ color: "var(--ink-muted)" }}>
           Checked in
         </h2>
+        {records.length > 0 && (
+          <p className="text-xs mb-3" style={{ color: "var(--ink-muted)" }}>
+            {records.filter((r) => attendanceRecordIsStudent(r) === true).length} students ·{" "}
+            {records.filter((r) => attendanceRecordIsStudent(r) === false).length} non-students
+          </p>
+        )}
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
           {records.length === 0 && (
             <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
@@ -329,7 +358,17 @@ export function AttendanceSessionPage() {
               style={{ borderColor: "var(--line-soft)" }}
             >
               <div>
-                <div>{r.member?.fullName ?? r.visitorName}</div>
+                <div>
+                  {r.member?.fullName ?? r.visitorName}
+                  {attendanceRecordIsStudent(r) === true && (
+                    <span
+                      className="ml-2 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}
+                    >
+                      Student
+                    </span>
+                  )}
+                </div>
                 {(r.member?.phone ?? r.visitorPhone) && (
                   <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
                     {r.member?.phone ?? r.visitorPhone}
@@ -358,7 +397,7 @@ export function AttendanceSessionPage() {
 
       {addMemberFor && (
         <MemberDialog
-          member={blankMemberFor(addMemberFor.visitorName ?? "", addMemberFor.visitorPhone)}
+          member={blankMemberFor(addMemberFor.visitorName ?? "", addMemberFor.visitorPhone, addMemberFor.isStudent)}
           members={allMembers}
           households={households}
           fellowships={fellowships}

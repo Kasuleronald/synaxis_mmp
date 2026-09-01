@@ -400,6 +400,7 @@ export function MembersPage() {
       email: email || null,
       address: address || null,
       status,
+      originatedAsWalkIn: false,
       leadershipRoles,
       notes: null,
       joinedAt: now,

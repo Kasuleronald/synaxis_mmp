@@ -125,7 +125,7 @@ export class AttendanceService {
     return runWithTenant(this.prisma, ctx, (tx) =>
       tx.attendanceRecord.findMany({
         where: { sessionId },
-        include: { member: { select: { id: true, fullName: true, phone: true } } },
+        include: { member: { select: { id: true, fullName: true, phone: true, isStudent: true } } },
         orderBy: { checkedInAt: "desc" },
       }),
     );
@@ -133,7 +133,7 @@ export class AttendanceService {
 
   async checkIn(ctx: TenantContext, sessionId: string, dto: CheckInDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
-    const { id, memberId, visitorName, visitorPhone } = dto;
+    const { id, memberId, visitorName, visitorPhone, isStudent } = dto;
     return runWithTenant(this.prisma, ctx, async (tx) => {
       const existingById = await tx.attendanceRecord.findUnique({ where: { id } });
       if (existingById) return existingById;
@@ -147,6 +147,9 @@ export class AttendanceService {
           memberId,
           visitorName,
           visitorPhone,
+          // Only meaningful for a walk-in -- a member's own profile already
+          // carries this, so it's ignored the moment memberId is set.
+          isStudent: memberId ? undefined : isStudent,
         },
       });
       if (!memberId) await maybeConvertRepeatWalkIn(tx, ctx.organizationId as string, visitorPhone, visitorName);
@@ -222,7 +225,7 @@ export class AttendanceService {
 
   async checkInByToken(token: string, dto: CheckInDto) {
     const session = await this.resolveSessionByToken(token);
-    const { id, memberId, visitorName, visitorPhone } = dto;
+    const { id, memberId, visitorName, visitorPhone, isStudent } = dto;
     return runWithTenant(
       this.prisma,
       { organizationId: session.organizationId, isPlatformAdmin: false },
@@ -239,6 +242,7 @@ export class AttendanceService {
             memberId,
             visitorName,
             visitorPhone,
+            isStudent: memberId ? undefined : isStudent,
           },
         });
         if (!memberId) await maybeConvertRepeatWalkIn(tx, session.organizationId, visitorPhone, visitorName);

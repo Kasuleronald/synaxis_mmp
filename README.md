@@ -2,8 +2,14 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (7) (Monthly-by-weekday event recurrence, a Dashboard fix, and a wider audit-log sweep -- see the newest section right below)
+**Last updated:** 2026-09-01 (8) (Student attendance tracking -- see the newest section right below)
 
+## 2026-09-01 (8) — Track students vs non-students at check-in
+
+- **Walk-in check-in (staff-operated and public/QR) now has a "Student" checkbox** alongside name and phone. A known Member's student status still comes from their own profile (the `isStudent` field already on Add Member) -- the checkbox only exists for walk-ins, who have no profile to look it up from.
+- **A session's check-in list now shows a live "X students · Y non-students" count**, plus a "Student" tag next to each student's name.
+- **The attendance Excel/PDF export gained a "Student" column** (Yes/No, blank for older records with no signal either way) -- so a program's/session's student vs non-student attendance can be extracted, not just viewed live.
+- Promoting a walk-in to a full Member ("Add as a new member") carries their student answer over into the new Member record automatically.
 ## 2026-09-01 (7) — "Every 1st/2nd/3rd Friday" recurrence, Dashboard fix, more audit coverage
 
 - **Events can now repeat on a specific weekday-of-month** -- "every 1st, 2nd, 3rd Friday" and/or "every last Friday", picked independently (tick any combination of 1st/2nd/3rd/4th/Last). Covers real schedules a plain date-of-month recurrence can't, e.g. worship evenings on the month's first three Fridays plus a separate overnight on the last one -- two events, two recurring series, no manual monthly editing either way.

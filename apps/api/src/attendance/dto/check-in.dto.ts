@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, MinLength, ValidateIf } from "class-validator";
+import { IsBoolean, IsOptional, IsString, IsUUID, MinLength, ValidateIf } from "class-validator";
 
 /** Exactly one of memberId / visitorName -- a known person or a walk-in. */
 export class CheckInDto {
@@ -17,4 +17,10 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   visitorPhone?: string;
+
+  // Walk-ins only -- a known member's student status lives on their own
+  // profile already, this is ignored server-side if memberId is set.
+  @IsOptional()
+  @IsBoolean()
+  isStudent?: boolean;
 }

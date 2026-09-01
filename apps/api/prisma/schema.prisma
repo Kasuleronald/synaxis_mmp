@@ -520,6 +520,11 @@ model AttendanceRecord {
   member         Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
   visitorName    String?
   visitorPhone   String?
+  // Only ever set for a walk-in (memberId null) -- a known Member already
+  // carries their own isStudent on their profile, so reporting reads that
+  // instead for a member check-in rather than duplicating it here (Sep
+  // 2026: "track ... students and non-students attendance of programs").
+  isStudent      Boolean?
   checkedInAt    DateTime @default(now())
   checkedInById  String?
   checkedInBy    User?    @relation("CheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)

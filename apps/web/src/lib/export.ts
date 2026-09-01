@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { AttendanceRecordDto, MemberDto } from "@life-mmp/shared";
+import { attendanceRecordIsStudent, type AttendanceRecordDto, type MemberDto } from "@life-mmp/shared";
 
 const FOOTER_TEXT = "Extracted from Synaxis - Ministry Management Platform";
 
@@ -118,12 +118,16 @@ export function exportMembersToPdf(members: MemberDto[], orgName: string, logoDa
 }
 
 function attendanceRows(records: AttendanceRecordDto[]) {
-  return records.map((r) => ({
-    Name: r.member?.fullName ?? r.visitorName ?? "",
-    Phone: r.member?.phone ?? r.visitorPhone ?? "",
-    Type: r.memberId ? "Member" : "Walk-in",
-    "Checked in at": new Date(r.checkedInAt).toLocaleString(),
-  }));
+  return records.map((r) => {
+    const isStudent = attendanceRecordIsStudent(r);
+    return {
+      Name: r.member?.fullName ?? r.visitorName ?? "",
+      Phone: r.member?.phone ?? r.visitorPhone ?? "",
+      Type: r.memberId ? "Member" : "Walk-in",
+      Student: isStudent == null ? "" : isStudent ? "Yes" : "No",
+      "Checked in at": new Date(r.checkedInAt).toLocaleString(),
+    };
+  });
 }
 
 export function exportAttendanceToExcel(records: AttendanceRecordDto[], orgName: string, sessionName: string) {

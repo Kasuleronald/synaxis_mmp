@@ -18,6 +18,7 @@ export function CheckInPage() {
   const [results, setResults] = useState<MemberDto[]>([]);
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
+  const [visitorIsStudent, setVisitorIsStudent] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,12 +92,15 @@ export function CheckInPage() {
       entity: "publicCheckIn",
       operation: "create",
       parentId: token,
-      payload: memberId ? { id, memberId } : { id, visitorName: name, visitorPhone: visitorPhone.trim() || undefined },
+      payload: memberId
+        ? { id, memberId }
+        : { id, visitorName: name, visitorPhone: visitorPhone.trim() || undefined, isStudent: visitorIsStudent },
     });
     setDone(name ?? "You're");
     setSearch("");
     setResults([]);
     setVisitorName("");
+    setVisitorIsStudent(false);
     const dialCode = org?.country ? COUNTRIES.find((c) => c.name === org.country)?.dialCode : undefined;
     setVisitorPhone(dialCode ? `${dialCode} ` : "");
   }
@@ -188,6 +192,10 @@ export function CheckInPage() {
             Check in
           </button>
         </div>
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--ink-muted)" }}>
+          <input type="checkbox" checked={visitorIsStudent} onChange={(e) => setVisitorIsStudent(e.target.checked)} />
+          I'm a student
+        </label>
       </div>
     </CenteredCard>
   );

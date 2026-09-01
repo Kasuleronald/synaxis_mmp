@@ -568,9 +568,12 @@ export interface AttendanceRecordDto {
   id: string;
   sessionId: string;
   memberId: string | null;
-  member?: { id: string; fullName: string; phone: string | null };
+  member?: { id: string; fullName: string; phone: string | null; isStudent: boolean | null };
   visitorName: string | null;
   visitorPhone: string | null;
+  // Only ever set for a walk-in -- a known member's student status comes
+  // from `member.isStudent` instead (Sep 2026).
+  isStudent: boolean | null;
   checkedInAt: string;
 }
 
@@ -580,6 +583,14 @@ export interface CreateAttendanceRecordInput {
   memberId?: string;
   visitorName?: string;
   visitorPhone?: string;
+  isStudent?: boolean;
+}
+
+/** A member check-in's student status always comes from their own profile,
+ * not the walk-in field -- this is the one place that distinction is made,
+ * so every screen/export agrees on it. */
+export function attendanceRecordIsStudent(r: Pick<AttendanceRecordDto, "member" | "isStudent">): boolean | null {
+  return r.member ? r.member.isStudent : r.isStudent;
 }
 
 // --- Sprint 3: Import Center -------------------------------------------
