@@ -3,6 +3,7 @@ import type { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { branchScopeFor, tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { CreateMemberDto } from "./dto/create-member.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 import { MembersService } from "./members.service";
@@ -13,6 +14,7 @@ export class MembersController {
   constructor(private readonly members: MembersService) {}
 
   @Post()
+  @Audit({ action: "MEMBER_CREATED", entityType: "member" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateMemberDto) {
     return this.members.create(tenantContextFor(user), dto, user.id);
   }
@@ -28,6 +30,7 @@ export class MembersController {
   }
 
   @Patch(":id")
+  @Audit({ action: "MEMBER_UPDATED", entityType: "member" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateMemberDto) {
     return this.members.update(tenantContextFor(user), id, dto);
   }

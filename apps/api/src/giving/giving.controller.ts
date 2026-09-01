@@ -17,6 +17,7 @@ import { UpdatePledgeDto } from "./dto/update-pledge.dto";
 import { CreateGivingBatchDto } from "./dto/create-giving-batch.dto";
 import { UpdateGivingBatchDto } from "./dto/update-giving-batch.dto";
 import { GivingService } from "./giving.service";
+import { Audit } from "../audit-log/audit.decorator";
 
 const FINANCE_ROLES = [Role.ORG_ADMIN, Role.FINANCE_OFFICER] as const;
 
@@ -27,6 +28,7 @@ export class GivingController {
 
   @Post("categories")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_CATEGORY_CREATED", entityType: "givingCategory" })
   createCategory(@CurrentUser() user: SessionUser, @Body() dto: CreateGivingCategoryDto) {
     return this.giving.createCategory(tenantContextFor(user), dto);
   }
@@ -38,18 +40,21 @@ export class GivingController {
 
   @Patch("categories/:id")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_CATEGORY_RENAMED", entityType: "givingCategory" })
   renameCategory(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: RenameGivingCategoryDto) {
     return this.giving.renameCategory(tenantContextFor(user), id, dto);
   }
 
   @Patch("categories/:id/deactivate")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_CATEGORY_DEACTIVATED", entityType: "givingCategory" })
   deactivateCategory(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.giving.deactivateCategory(tenantContextFor(user), id);
   }
 
   @Post("records")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_RECORD_CREATED", entityType: "givingRecord" })
   createRecord(@CurrentUser() user: SessionUser, @Body() dto: CreateGivingRecordDto) {
     return this.giving.createRecord(tenantContextFor(user), user.id, dto);
   }
@@ -73,6 +78,7 @@ export class GivingController {
 
   @Post("funds")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "FUND_CREATED", entityType: "fund" })
   createFund(@CurrentUser() user: SessionUser, @Body() dto: CreateFundDto) {
     return this.giving.createFund(tenantContextFor(user), dto);
   }
@@ -84,12 +90,14 @@ export class GivingController {
 
   @Patch("funds/:id")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "FUND_UPDATED", entityType: "fund" })
   updateFund(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateFundDto) {
     return this.giving.updateFund(tenantContextFor(user), id, dto);
   }
 
   @Patch("funds/:id/deactivate")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "FUND_DEACTIVATED", entityType: "fund" })
   deactivateFund(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.giving.deactivateFund(tenantContextFor(user), id);
   }
@@ -98,6 +106,7 @@ export class GivingController {
 
   @Post("vendors")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "VENDOR_CREATED", entityType: "vendor" })
   createVendor(@CurrentUser() user: SessionUser, @Body() dto: CreateVendorDto) {
     return this.giving.createVendor(tenantContextFor(user), dto);
   }
@@ -109,12 +118,14 @@ export class GivingController {
 
   @Patch("vendors/:id")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "VENDOR_UPDATED", entityType: "vendor" })
   updateVendor(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateVendorDto) {
     return this.giving.updateVendor(tenantContextFor(user), id, dto);
   }
 
   @Patch("vendors/:id/deactivate")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "VENDOR_DEACTIVATED", entityType: "vendor" })
   deactivateVendor(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.giving.deactivateVendor(tenantContextFor(user), id);
   }
@@ -123,6 +134,7 @@ export class GivingController {
 
   @Post("pledges")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "PLEDGE_CREATED", entityType: "pledge" })
   createPledge(@CurrentUser() user: SessionUser, @Body() dto: CreatePledgeDto) {
     return this.giving.createPledge(tenantContextFor(user), user.id, dto);
   }
@@ -134,12 +146,14 @@ export class GivingController {
 
   @Patch("pledges/:id")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "PLEDGE_UPDATED", entityType: "pledge" })
   updatePledge(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdatePledgeDto) {
     return this.giving.updatePledge(tenantContextFor(user), id, dto);
   }
 
   @Patch("pledges/:id/reactivate")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "PLEDGE_REACTIVATED", entityType: "pledge" })
   reactivatePledge(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body("endDate") endDate?: string) {
     return this.giving.reactivatePledge(tenantContextFor(user), id, endDate);
   }
@@ -148,6 +162,7 @@ export class GivingController {
 
   @Post("batches")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_BATCH_CREATED", entityType: "givingBatch" })
   createBatch(@CurrentUser() user: SessionUser, @Body() dto: CreateGivingBatchDto) {
     return this.giving.createBatch(tenantContextFor(user), user.id, dto);
   }
@@ -159,12 +174,14 @@ export class GivingController {
 
   @Patch("batches/:id")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_BATCH_UPDATED", entityType: "givingBatch" })
   updateBatch(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateGivingBatchDto) {
     return this.giving.updateBatch(tenantContextFor(user), id, dto);
   }
 
   @Patch("batches/:id/close")
   @Roles(...FINANCE_ROLES)
+  @Audit({ action: "GIVING_BATCH_CLOSED", entityType: "givingBatch" })
   closeBatch(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.giving.closeBatch(tenantContextFor(user), id);
   }

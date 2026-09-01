@@ -3,6 +3,7 @@ import type { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { CreateServiceUnitDto } from "./dto/create-service-unit.dto";
 import { UpdateServiceUnitDto } from "./dto/update-service-unit.dto";
 import { AddServiceUnitMemberDto } from "./dto/add-service-unit-member.dto";
@@ -14,6 +15,7 @@ export class ServiceUnitsController {
   constructor(private readonly serviceUnits: ServiceUnitsService) {}
 
   @Post()
+  @Audit({ action: "SERVICE_UNIT_CREATED", entityType: "serviceUnit" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateServiceUnitDto) {
     return this.serviceUnits.create(tenantContextFor(user), dto);
   }
@@ -29,16 +31,19 @@ export class ServiceUnitsController {
   }
 
   @Patch(":id")
+  @Audit({ action: "SERVICE_UNIT_UPDATED", entityType: "serviceUnit" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateServiceUnitDto) {
     return this.serviceUnits.update(tenantContextFor(user), id, dto);
   }
 
   @Post(":id/members")
+  @Audit({ action: "SERVICE_UNIT_MEMBER_ADDED", entityType: "serviceUnit" })
   addMember(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: AddServiceUnitMemberDto) {
     return this.serviceUnits.addMember(tenantContextFor(user), id, dto);
   }
 
   @Delete(":id/members/:memberId")
+  @Audit({ action: "SERVICE_UNIT_MEMBER_REMOVED", entityType: "serviceUnit" })
   removeMember(@CurrentUser() user: SessionUser, @Param("id") id: string, @Param("memberId") memberId: string) {
     return this.serviceUnits.removeMember(tenantContextFor(user), id, memberId);
   }

@@ -4,6 +4,7 @@ import { FollowUpStatus } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { CreateFollowUpDto } from "./dto/create-follow-up.dto";
 import { UpdateFollowUpDto } from "./dto/update-follow-up.dto";
 import { FollowUpsService } from "./follow-ups.service";
@@ -14,6 +15,7 @@ export class FollowUpsController {
   constructor(private readonly followUps: FollowUpsService) {}
 
   @Post()
+  @Audit({ action: "FOLLOW_UP_CREATED", entityType: "followUp" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateFollowUpDto) {
     return this.followUps.create(tenantContextFor(user), dto);
   }
@@ -24,6 +26,7 @@ export class FollowUpsController {
   }
 
   @Patch(":id")
+  @Audit({ action: "FOLLOW_UP_UPDATED", entityType: "followUp" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateFollowUpDto) {
     return this.followUps.update(tenantContextFor(user), id, dto);
   }

@@ -5,6 +5,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { branchScopeFor, tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { CreateAttendanceSessionDto } from "./dto/create-session.dto";
 import { CheckInDto } from "./dto/check-in.dto";
 import { LinkMemberDto } from "./dto/link-member.dto";
@@ -16,6 +17,7 @@ export class AttendanceController {
   constructor(private readonly attendance: AttendanceService) {}
 
   @Post()
+  @Audit({ action: "ATTENDANCE_SESSION_CREATED", entityType: "attendanceSession" })
   createSession(@CurrentUser() user: SessionUser, @Body() dto: CreateAttendanceSessionDto) {
     return this.attendance.createSession(tenantContextFor(user), dto);
   }
@@ -49,11 +51,13 @@ export class AttendanceController {
   @Delete(":sessionId/records/:recordId")
   @UseGuards(RolesGuard)
   @Roles(Role.ORG_ADMIN, Role.DEPARTMENT_HEAD, Role.FELLOWSHIP_LEADER)
+  @Audit({ action: "ATTENDANCE_RECORD_DELETED", entityType: "attendanceRecord" })
   deleteRecord(@CurrentUser() user: SessionUser, @Param("recordId") recordId: string) {
     return this.attendance.deleteRecord(tenantContextFor(user), recordId);
   }
 
   @Patch(":sessionId/records/:recordId/link-member")
+  @Audit({ action: "ATTENDANCE_RECORD_LINKED", entityType: "attendanceRecord" })
   linkMember(@CurrentUser() user: SessionUser, @Param("recordId") recordId: string, @Body() dto: LinkMemberDto) {
     return this.attendance.linkMember(tenantContextFor(user), recordId, dto);
   }
