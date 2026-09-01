@@ -29,10 +29,13 @@ async function bootstrap() {
 
   // bodyParser: false -- Nest's default json parser caps at 100kb, which
   // rejects a base64-encoded church logo (Settings screen). Re-added below
-  // with a higher limit instead.
+  // with a higher limit instead -- also what a restored backup file needs
+  // to fit through (Settings -> Data Backup): a whole organization's data,
+  // including any photos stored as base64 Asset rows, arrives as one JSON
+  // body on that route.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
-  app.use(express.json({ limit: "2mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
   const config = app.get(ConfigService);
 
   // Webuzo's reverse proxy (LiteSpeed) terminates TLS and forwards to this

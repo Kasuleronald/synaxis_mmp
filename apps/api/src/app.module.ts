@@ -34,6 +34,7 @@ import { DevotionalsModule } from "./devotionals/devotionals.module";
 import { SoulWinningModule } from "./soul-winning/soul-winning.module";
 import { ServiceUnitsModule } from "./service-units/service-units.module";
 import { AuditLogModule } from "./audit-log/audit-log.module";
+import { BackupModule } from "./backup/backup.module";
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { AuditLogModule } from "./audit-log/audit-log.module";
     SoulWinningModule,
     ServiceUnitsModule,
     AuditLogModule,
+    BackupModule,
   ],
   controllers: [AppController],
 })

@@ -22,6 +22,12 @@ export class DeletionRequestsService {
   async create(ctx: TenantContext, requestedById: string, dto: CreateDeletionRequestDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
     return runWithTenant(this.prisma, ctx, async (tx) => {
+      if (dto.entityType === "branch") {
+        const branch = await tx.branch.findUnique({ where: { id: dto.entityId } });
+        if (branch?.isMain) {
+          throw new ForbiddenException("Make another branch main first -- there always has to be exactly one main branch.");
+        }
+      }
       const request = await tx.deletionRequest.create({
         data: { organizationId: ctx.organizationId as string, requestedById, ...dto },
         include: INCLUDE,
@@ -133,6 +139,16 @@ export class DeletionRequestsService {
       case "orgUnit":
         await tx.orgUnit.delete({ where: { id: entityId } });
         return;
+      case "branch": {
+        // Re-checked here too, not just at request time -- a branch could
+        // have been made main in the time between filing and approval.
+        const branch = await tx.branch.findUnique({ where: { id: entityId } });
+        if (branch?.isMain) {
+          throw new ForbiddenException("This is now the main branch -- make another one main first.");
+        }
+        await tx.branch.delete({ where: { id: entityId } });
+        return;
+      }
       default:
         // Unreachable while DELETABLE_ENTITY_TYPES only lists "member" --
         // the DTO's @IsIn already rejects anything else before this runs.

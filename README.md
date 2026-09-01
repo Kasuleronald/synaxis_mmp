@@ -2,7 +2,14 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-08-29 (4) (Spouse-picker dropdown no longer clipped; walk-in phone defaults to the org's country code -- see the newest section right below)
+**Last updated:** 2026-09-01 (Data backup/restore, audit log, staff branch/role editing, branch deletion -- see the newest section right below)
+
+## 2026-09-01 — Data backup/restore, audit log, staff editing, branch deletion
+
+- **Settings -> Data backup** -- download a complete copy of your organization's data (members, households, fellowships, departments, service units, attendance, giving, pledges, requisitions, assets, and more) as one file, and restore from it if you ever need to. Restoring replaces your organization's current data with what's in the file -- worth doing before a major update or a hosting/storage change, and there for the rare case of actual data loss, not everyday use. Every export and restore is itself logged.
+- **Audit log, started** -- logins are now tracked end to end (both the Platform Admin console and your own organization will get their own views onto this soon); the underlying infrastructure now also records deletions, approvals, and most create/update actions across People, Ministry, and Finance, with more modules being wired in as they're swept.
+- **Staff can now be edited after inviting them** -- fix a name, change their role, or reassign their branch (the "attached to the wrong branch" fix), all from an Edit icon on their row in Staff & roles -- previously only the additive permission toggles were editable.
+- **Branches can now be deleted** -- files the same request-an-approver-confirms request every other deletion in Synaxis uses; the main branch can't be deleted (make another one main first).
 
 ## 2026-08-29 (4) — Spouse-picker dropdown fix, walk-in phone country-code default
 

@@ -5,6 +5,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateAvatarDto } from "./dto/update-avatar.dto";
@@ -17,6 +18,7 @@ export class UsersController {
 
   @Post()
   @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "STAFF_INVITED", entityType: "user" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateUserDto) {
     return this.users.create(tenantContextFor(user), dto);
   }
@@ -29,6 +31,7 @@ export class UsersController {
 
   @Patch(":id")
   @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "STAFF_UPDATED", entityType: "user" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateUserDto) {
     return this.users.update(tenantContextFor(user), id, dto);
   }

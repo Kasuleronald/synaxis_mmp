@@ -70,11 +70,20 @@ export class UsersService {
     );
   }
 
-  /** Org Admin appoints/revokes deletion approvers here (Staff screen). */
+  /** Org Admin appoints/revokes deletion approvers here (Staff screen), and
+   * also corrects a staff member's own name/role/branch after the fact --
+   * e.g. an invite that got attached to the wrong branch by mistake. */
   async update(ctx: TenantContext, id: string, dto: UpdateUserDto) {
-    return runWithTenant(this.prisma, ctx, (tx) =>
-      tx.user.update({ where: { id }, data: dto, select: USER_SELECT }),
-    );
+    if (dto.role && !ORG_ASSIGNABLE_ROLES.includes(dto.role)) {
+      throw new BadRequestException(`Organizations cannot assign the ${dto.role} role`);
+    }
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      if (dto.branchId) {
+        const branch = await tx.branch.findUnique({ where: { id: dto.branchId } });
+        if (!branch) throw new BadRequestException("branchId does not belong to your organization");
+      }
+      return tx.user.update({ where: { id }, data: dto, select: USER_SELECT });
+    });
   }
 
   /** Self-service, unlike `update` above -- any logged-in user can set their

@@ -1,7 +1,7 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { COUNTRIES, CURRENCIES, Theme } from "@life-mmp/shared";
 import { useOrg } from "../context/OrgContext";
-import { ApiError } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 
 const THEME_SWATCHES: Record<Theme, { label: string; color: string }> = {
   [Theme.ONYX]: { label: "Onyx", color: "#1B1B1B" },
@@ -52,6 +52,17 @@ export function SettingsPage() {
   const [savingCurrencyToggle, setSavingCurrencyToggle] = useState(false);
   const [currencyToggleMessage, setCurrencyToggleMessage] = useState<string | null>(null);
   const [currencyToggleError, setCurrencyToggleError] = useState<string | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreResult, setRestoreResult] = useState<{ counts: Record<string, number> } | null>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!org) return;
@@ -150,6 +161,72 @@ export function SettingsPage() {
     } finally {
       setSavingTheme(null);
     }
+  }
+
+  async function onDownloadBackup() {
+    setExporting(true);
+    setExportError(null);
+    setExportMessage(null);
+    try {
+      const bundle = await api.get<{ organization: { slug: string } }>("/backup/export");
+      const blob = new Blob([JSON.stringify(bundle)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const datePart = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `synaxis-backup-${bundle.organization?.slug ?? "organization"}-${datePart}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportMessage("Backup downloaded. Keep this file somewhere safe -- it contains your organization's full data.");
+    } catch (err) {
+      setExportError(err instanceof ApiError ? err.message : "Couldn't create the backup.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function onPickRestoreFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRestoreFile(file);
+    setRestoreResult(null);
+    setRestoreError(null);
+    setConfirmingRestore(true);
+    setRestoreConfirmText("");
+  }
+
+  async function onConfirmRestore() {
+    if (!restoreFile) return;
+    setRestoring(true);
+    setRestoreError(null);
+    try {
+      const text = await restoreFile.text();
+      let bundle: unknown;
+      try {
+        bundle = JSON.parse(text);
+      } catch {
+        throw new ApiError(400, "That file isn't valid JSON -- it doesn't look like a Synaxis backup.");
+      }
+      const result = await api.post<{ counts: Record<string, number> }>("/backup/restore", bundle);
+      setRestoreResult(result);
+      setConfirmingRestore(false);
+      setRestoreFile(null);
+      if (restoreFileInputRef.current) restoreFileInputRef.current.value = "";
+    } catch (err) {
+      setRestoreError(err instanceof ApiError ? err.message : "Couldn't restore this backup.");
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  function cancelRestore() {
+    setConfirmingRestore(false);
+    setRestoreFile(null);
+    setRestoreConfirmText("");
+    setRestoreError(null);
+    if (restoreFileInputRef.current) restoreFileInputRef.current.value = "";
   }
 
   if (!org) {
@@ -498,6 +575,107 @@ export function SettingsPage() {
           </button>
         </div>
       </form>
+
+      <section className="rounded-xl border p-5 mt-6 grid gap-4" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+        <div>
+          <h2 className="text-sm font-medium mb-1">Data backup</h2>
+          <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+            Download a complete copy of {org.displayName}'s data -- members, households, fellowships,
+            departments, service units, attendance, giving, pledges, requisitions, assets, and more.
+            Worth doing before a major system update, before switching hosting or storage providers,
+            or just periodically for your own safekeeping. Restoring replaces your organization's
+            current data with what's in the file, for the rare case of actual data loss -- it isn't
+            meant for everyday use.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={onDownloadBackup}
+            className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            {exporting ? "Preparing…" : "Download backup"}
+          </button>
+
+          <label
+            className="rounded-md px-4 py-2 text-sm font-medium cursor-pointer"
+            style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+          >
+            Restore from backup
+            <input ref={restoreFileInputRef} type="file" accept="application/json" onChange={onPickRestoreFile} className="hidden" />
+          </label>
+        </div>
+
+        {exportError && (
+          <div className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+            {exportError}
+          </div>
+        )}
+        {exportMessage && (
+          <div className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+            {exportMessage}
+          </div>
+        )}
+        {restoreResult && (
+          <div className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
+            Restore complete. {Object.values(restoreResult.counts).reduce((a, b) => a + b, 0).toLocaleString()} records
+            written back across {Object.keys(restoreResult.counts).length} tables.
+          </div>
+        )}
+      </section>
+
+      {confirmingRestore && restoreFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="w-full max-w-md rounded-xl border p-5" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+            <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--danger)" }}>
+              Replace {org.displayName}'s data?
+            </h2>
+            <p className="text-sm mb-3" style={{ color: "var(--ink)" }}>
+              Restoring <strong>{restoreFile.name}</strong> will replace every record this backup covers
+              (members, households, fellowships, attendance, giving, and the rest) with what's in the
+              file. Anything added or changed since that backup was made will be gone. This can't be
+              undone.
+            </p>
+            <label className="block text-sm mb-1">
+              Type <strong>{org.displayName}</strong> to confirm
+            </label>
+            <input
+              value={restoreConfirmText}
+              onChange={(e) => setRestoreConfirmText(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm mb-3"
+              style={{ borderColor: "var(--line)" }}
+            />
+            {restoreError && (
+              <div className="rounded-md px-3 py-2 text-sm mb-3" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+                {restoreError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={restoring || restoreConfirmText !== org.displayName}
+                onClick={onConfirmRestore}
+                className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ background: "var(--danger)", color: "white" }}
+              >
+                {restoring ? "Restoring…" : "Replace data and restore"}
+              </button>
+              <button
+                type="button"
+                disabled={restoring}
+                onClick={cancelRestore}
+                className="rounded-md px-4 py-2 text-sm font-medium"
+                style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

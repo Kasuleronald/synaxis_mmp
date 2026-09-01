@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
-import { EditIcon, IconButton } from "../components/icons";
+import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 import { useTerminology } from "../hooks/useTerminology";
 
 export function OrgAdminPage() {
@@ -17,8 +17,17 @@ export function OrgAdminPage() {
   const [editBranchLeaderId, setEditBranchLeaderId] = useState("");
   const [branchSavingId, setBranchSavingId] = useState<string | null>(null);
   const [branchEditError, setBranchEditError] = useState<string | null>(null);
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [branchDeleteMessage, setBranchDeleteMessage] = useState<Record<string, string>>({});
 
   const eligibleBranchLeaders = members.filter((m) => m.leadershipRoles.includes(LeadershipRole.BRANCH_LEADER));
+
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editUserName, setEditUserName] = useState("");
+  const [editUserRole, setEditUserRole] = useState<Role>(Role.FELLOWSHIP_LEADER);
+  const [editUserBranchId, setEditUserBranchId] = useState("");
+  const [userEditError, setUserEditError] = useState<string | null>(null);
+  const [userSavingId, setUserSavingId] = useState<string | null>(null);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -83,6 +92,44 @@ export function OrgAdminPage() {
       await loadAll();
     } finally {
       setBranchSavingId(null);
+    }
+  }
+
+  async function requestDeleteBranch(b: BranchDto) {
+    try {
+      await api.post("/deletion-requests", { entityType: "branch", entityId: b.id, entityLabel: b.name });
+      setBranchDeleteMessage((prev) => ({ ...prev, [b.id]: "Deletion requested -- awaiting an approver." }));
+    } catch (err) {
+      setBranchDeleteMessage((prev) => ({
+        ...prev,
+        [b.id]: err instanceof ApiError ? err.message : "Couldn't file the deletion request.",
+      }));
+    }
+  }
+
+  function startEditUser(u: UserDto) {
+    setEditingUserId(u.id);
+    setEditUserName(u.fullName);
+    setEditUserRole(u.role);
+    setEditUserBranchId(u.branchId ?? "");
+    setUserEditError(null);
+  }
+
+  async function saveUserEdit(id: string) {
+    setUserSavingId(id);
+    setUserEditError(null);
+    try {
+      const updated = await api.patch<UserDto>(`/users/${id}`, {
+        fullName: editUserName,
+        role: editUserRole,
+        branchId: editUserBranchId || null,
+      });
+      setUsers((prev) => prev.map((x) => (x.id === id ? updated : x)));
+      setEditingUserId(null);
+    } catch (err) {
+      setUserEditError(err instanceof ApiError ? err.message : "Something went wrong.");
+    } finally {
+      setUserSavingId(null);
     }
   }
 
@@ -259,7 +306,44 @@ export function OrgAdminPage() {
                       <IconButton title="Edit" onClick={() => startEditBranch(b)}>
                         <EditIcon />
                       </IconButton>
+                      {!b.isMain && (
+                        <IconButton title="Request deletion" onClick={() => setDeletingBranchId(b.id)}>
+                          <TrashIcon />
+                        </IconButton>
+                      )}
                     </div>
+                  </div>
+                )}
+                {deletingBranchId === b.id && (
+                  <div className="mx-4 mb-3 rounded-md p-3 text-sm" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+                    {branchDeleteMessage[b.id] ? (
+                      <p>{branchDeleteMessage[b.id]}</p>
+                    ) : (
+                      <>
+                        <p className="mb-2">
+                          This won't delete "{b.name}" right away -- it files a request an appointed
+                          approver has to confirm first.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteBranch(b)}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium"
+                            style={{ background: "var(--danger)", color: "white" }}
+                          >
+                            Request deletion
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingBranchId(null)}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium"
+                            style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -366,11 +450,77 @@ export function OrgAdminPage() {
               className="px-4 py-3 border-t first:border-t-0 text-sm"
               style={{ borderColor: "var(--line-soft)" }}
             >
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="font-medium">{u.fullName}</span>
-                <span style={{ color: "var(--ink-muted)" }}>{u.role.replace(/_/g, " ").toLowerCase()}</span>
-              </div>
-              {u.role !== Role.ORG_ADMIN && (
+              {editingUserId === u.id ? (
+                <div className="grid gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={editUserName}
+                      onChange={(e) => setEditUserName(e.target.value)}
+                      className="rounded-md border px-2 py-1.5 text-sm"
+                      style={{ borderColor: "var(--line)" }}
+                    />
+                    <select
+                      value={editUserRole}
+                      onChange={(e) => setEditUserRole(e.target.value as Role)}
+                      className="rounded-md border px-2 py-1.5 text-sm"
+                      style={{ borderColor: "var(--line)" }}
+                    >
+                      {ORG_ASSIGNABLE_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r.replace(/_/g, " ").toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={editUserBranchId}
+                      onChange={(e) => setEditUserBranchId(e.target.value)}
+                      className="rounded-md border px-2 py-1.5 text-sm col-span-2"
+                      style={{ borderColor: "var(--line)" }}
+                    >
+                      <option value="">No branch</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {userEditError && (
+                    <div className="rounded-md px-2 py-1.5 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+                      {userEditError}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={userSavingId === u.id}
+                      onClick={() => saveUserEdit(u.id)}
+                      className="text-xs font-medium disabled:opacity-60"
+                      style={{ color: "var(--accent-ink)" }}
+                    >
+                      {userSavingId === u.id ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditingUserId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <span className="font-medium">{u.fullName}</span>
+                    <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                      {u.role.replace(/_/g, " ").toLowerCase()}
+                      {" · "}
+                      {branches.find((b) => b.id === u.branchId)?.name ?? "No branch"}
+                    </div>
+                  </div>
+                  <IconButton title="Edit" onClick={() => startEditUser(u)}>
+                    <EditIcon />
+                  </IconButton>
+                </div>
+              )}
+              {u.role !== Role.ORG_ADMIN && editingUserId !== u.id && (
                 <div className="flex items-center gap-2 flex-wrap mt-2">
                     <button
                       type="button"
