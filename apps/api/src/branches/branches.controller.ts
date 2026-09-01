@@ -7,6 +7,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
 import { CreateBranchDto } from "./dto/create-branch.dto";
 import { UpdateBranchDto } from "./dto/update-branch.dto";
+import { Audit } from "../audit-log/audit.decorator";
 import { BranchesService } from "./branches.service";
 
 @Controller("branches")
@@ -16,6 +17,7 @@ export class BranchesController {
 
   @Post()
   @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "BRANCH_CREATED", entityType: "branch" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateBranchDto) {
     return this.branches.create(tenantContextFor(user), dto);
   }
@@ -29,6 +31,7 @@ export class BranchesController {
 
   @Patch(":id")
   @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "BRANCH_UPDATED", entityType: "branch" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateBranchDto) {
     return this.branches.update(tenantContextFor(user), id, dto);
   }

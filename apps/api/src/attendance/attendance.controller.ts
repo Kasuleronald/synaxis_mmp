@@ -41,6 +41,7 @@ export class AttendanceController {
   // signed in on a shared device uses this instead of the /checkin/:token
   // page, but writes through the identical upsert-by-id path.
   @Post(":id/check-in")
+  @Audit({ action: "ATTENDANCE_RECORD_CHECKED_IN", entityType: "attendanceRecord", labelFields: ["visitorName"] })
   checkIn(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: CheckInDto) {
     return this.attendance.checkIn(tenantContextFor(user), id, dto);
   }

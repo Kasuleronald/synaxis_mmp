@@ -17,6 +17,7 @@ import type { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
+import { Audit } from "../audit-log/audit.decorator";
 import { AssetsService } from "./assets.service";
 
 const MAX_FILE_BYTES = 6 * 1024 * 1024; // 6MB -- generous for a client-optimized photo
@@ -28,6 +29,7 @@ export class AssetsController {
 
   @Post()
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_FILE_BYTES } }))
+  @Audit({ action: "ASSET_UPLOADED", entityType: "asset" })
   upload(@CurrentUser() user: SessionUser, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("No file uploaded");
     return this.assets.upload(tenantContextFor(user), file, user.id);
@@ -51,6 +53,7 @@ export class AssetsController {
 
   @Delete(":id")
   @HttpCode(204)
+  @Audit({ action: "ASSET_DELETED", entityType: "asset" })
   remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.assets.remove(tenantContextFor(user), id);
   }

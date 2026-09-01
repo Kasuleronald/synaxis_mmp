@@ -8,6 +8,7 @@ import { tenantContextFor } from "../auth/tenant-context";
 import { CreateOrganizationDto } from "./dto/create-organization.dto";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { SetSuspendedDto } from "./dto/set-suspended.dto";
+import { Audit } from "../audit-log/audit.decorator";
 import { OrganizationsService } from "./organizations.service";
 import type { SessionUser } from "@life-mmp/shared";
 
@@ -18,6 +19,7 @@ export class OrganizationsController {
 
   @Post()
   @Roles(Role.PLATFORM_ADMIN)
+  @Audit({ action: "ORGANIZATION_CREATED", entityType: "organization" })
   create(@CurrentUser() user: SessionUser, @Body() dto: CreateOrganizationDto) {
     return this.organizations.createOrganization(tenantContextFor(user), dto);
   }
@@ -39,18 +41,21 @@ export class OrganizationsController {
 
   @Patch(":id")
   @Roles(Role.ORG_ADMIN, Role.PLATFORM_ADMIN)
+  @Audit({ action: "ORGANIZATION_UPDATED", entityType: "organization" })
   update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: UpdateOrganizationDto) {
     return this.organizations.updateOrganization(tenantContextFor(user), id, dto);
   }
 
   @Patch(":id/suspension")
   @Roles(Role.PLATFORM_ADMIN)
+  @Audit({ action: "ORGANIZATION_SUSPENSION_UPDATED", entityType: "organization" })
   setSuspended(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body() dto: SetSuspendedDto) {
     return this.organizations.setSuspended(tenantContextFor(user), id, dto.isSuspended);
   }
 
   @Post(":id/admin/reset-link")
   @Roles(Role.PLATFORM_ADMIN)
+  @Audit({ action: "ORGANIZATION_ADMIN_RESET_LINK_GENERATED", entityType: "organization" })
   generateAdminResetLink(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.organizations.generateAdminResetLink(tenantContextFor(user), id);
   }

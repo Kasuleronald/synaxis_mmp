@@ -4,6 +4,7 @@ import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
 import { UpsertDevotionalDto } from "./dto/upsert-devotional.dto";
+import { Audit } from "../audit-log/audit.decorator";
 import { DevotionalsService } from "./devotionals.service";
 
 @Controller("devotionals")
@@ -22,6 +23,7 @@ export class DevotionalsController {
   }
 
   @Post()
+  @Audit({ action: "DEVOTIONAL_UPSERTED", entityType: "devotional" })
   upsert(@CurrentUser() user: SessionUser, @Body() dto: UpsertDevotionalDto) {
     return this.devotionals.upsert(tenantContextFor(user), user, dto);
   }

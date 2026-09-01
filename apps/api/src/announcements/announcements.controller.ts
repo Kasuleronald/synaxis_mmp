@@ -6,6 +6,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { tenantContextFor } from "../auth/tenant-context";
 import { CreateAnnouncementDto } from "./dto/create-announcement.dto";
+import { Audit } from "../audit-log/audit.decorator";
 import { AnnouncementsService } from "./announcements.service";
 
 @Controller("announcements")
@@ -15,6 +16,7 @@ export class AnnouncementsController {
 
   @Post()
   @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "ANNOUNCEMENT_BROADCAST", entityType: "announcement", labelFields: ["message"] })
   broadcast(@CurrentUser() user: SessionUser, @Body() dto: CreateAnnouncementDto) {
     return this.announcements.broadcast(tenantContextFor(user), user.id, dto);
   }

@@ -45,6 +45,7 @@ export class ImportsController {
   }
 
   @Patch("rows/:rowId")
+  @Audit({ action: "IMPORT_ROW_UPDATED", entityType: "importStagingRow" })
   updateRow(@CurrentUser() user: SessionUser, @Param("rowId") rowId: string, @Body() dto: UpdateStagingRowDto) {
     return this.imports.updateRow(tenantContextFor(user), rowId, dto);
   }
