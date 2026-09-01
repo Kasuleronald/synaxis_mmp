@@ -75,6 +75,7 @@ model Organization {
   events             Event[]
   attendanceSessions AttendanceSession[]
   attendanceRecords  AttendanceRecord[]
+  meetingCategories  MeetingCategory[]
   importBatches      ImportBatch[]
   fellowships           Fellowship[]
   orgUnits               OrgUnit[]
@@ -183,6 +184,12 @@ model User {
   // Same appointment model again -- edits the org's Daily Devotional
   // without needing Org Admin access.
   isDevotionalEditor Boolean @default(false)
+  // Same appointment model again -- an auto-generated follow-up (repeat
+  // absenteeism, a walk-in's 3rd visit) is assigned to whichever holder of
+  // this flag currently has the fewest pending follow-ups, rather than
+  // requiring an Org Admin to notice and assign it manually (Sep 2026). Can
+  // be more than one person.
+  isDefaultFollowUpUser Boolean @default(false)
   // Set when a Platform Admin or Org Admin generates a reset link for
   // someone else's account -- emailed straight to that person, never shown
   // to the admin who triggered it (Sep 2026). Single active token, cleared
@@ -343,6 +350,12 @@ model Member {
   email          String?
   address        String?
   status         MemberStatus @default(VISITOR)
+  // True only when this record was auto-created after a walk-in (no
+  // account, no prior Member row) checked into the same meeting category
+  // three times in a row (Sep 2026) -- lets the directory surface "repeat
+  // visitor, never formally registered" distinctly from every other way a
+  // Member row comes to exist.
+  originatedAsWalkIn Boolean @default(false)
   // A member can hold several leadership positions at once (e.g. a
   // Directorate Leader who is also a Fellowship Leader) -- a scalar array
   // rather than a single field, and deliberately separate from `status`
@@ -424,6 +437,12 @@ model Event {
   // session, own debrief), this just marks which ones came from the same
   // series. Null for a plain one-off event.
   recurrenceGroupId String?
+  // Optional (Sep 2026) -- lets a calendar-driven recurring event (e.g. a
+  // weekly Sunday Service) feed the same repeat-absenteeism tracking as a
+  // spot session started directly from Attendance, by tagging the
+  // occurrence's own AttendanceSession with the same category at creation.
+  categoryId     String?
+  category       MeetingCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -433,6 +452,27 @@ model Event {
   @@index([organizationId])
   @@index([recurrenceGroupId])
   @@map("events")
+}
+
+/// Admin-defined kinds of recurring meeting (Sunday Service, Midweek
+/// Service, Cell Fellowship, Worship Evening, ...) (Sep 2026). Tagging a
+/// session with one is what lets repeat-absenteeism be tracked per meeting
+/// type instead of across the church's attendance as one undifferentiated
+/// pool. isActive (not delete) so a retired category doesn't orphan the
+/// sessions/history that already reference it.
+model MeetingCategory {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  events             Event[]
+  attendanceSessions AttendanceSession[]
+
+  @@index([organizationId])
+  @@map("meeting_categories")
 }
 
 /// One occurrence to check attendance against (a Sunday service, a class
@@ -449,6 +489,11 @@ model AttendanceSession {
   event          Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
   classId        String?
   class          DiscipleshipClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  // Which recurring meeting type this is (Sep 2026) -- null for a session
+  // with no category picked (an ad hoc one-off, or created before this
+  // feature existed). Drives the repeat-absenteeism check.
+  categoryId     String?
+  category       MeetingCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   name           String
   date           DateTime
   qrToken        String   @unique @default(uuid())
@@ -457,6 +502,7 @@ model AttendanceSession {
   records AttendanceRecord[]
 
   @@index([organizationId])
+  @@index([categoryId])
   @@map("attendance_sessions")
 }
 

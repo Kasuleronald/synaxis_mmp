@@ -13,6 +13,10 @@ export class CreateAttendanceSessionDto {
   @IsUUID()
   classId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
   @IsString()
   @MinLength(1)
   name!: string;

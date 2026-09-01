@@ -93,6 +93,7 @@ export class EventsService {
             startsAt: occ.startsAt,
             endsAt: occ.endsAt ?? undefined,
             recurrenceGroupId,
+            categoryId: dto.categoryId,
           },
         });
         const session = await tx.attendanceSession.create({
@@ -100,6 +101,7 @@ export class EventsService {
             organizationId: ctx.organizationId as string,
             branchId: dto.branchId,
             eventId: event.id,
+            categoryId: dto.categoryId,
             name: event.title,
             date: event.startsAt,
           },

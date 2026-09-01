@@ -35,6 +35,10 @@ export class CreateEventDto {
   endsAt?: string;
 
   @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => RecurrenceDto)
   recurrence?: RecurrenceDto;

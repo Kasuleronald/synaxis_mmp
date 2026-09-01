@@ -35,6 +35,7 @@ import { SoulWinningModule } from "./soul-winning/soul-winning.module";
 import { ServiceUnitsModule } from "./service-units/service-units.module";
 import { AuditLogModule } from "./audit-log/audit-log.module";
 import { BackupModule } from "./backup/backup.module";
+import { MeetingCategoriesModule } from "./meeting-categories/meeting-categories.module";
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { BackupModule } from "./backup/backup.module";
     ServiceUnitsModule,
     AuditLogModule,
     BackupModule,
+    MeetingCategoriesModule,
   ],
   controllers: [AppController],
 })

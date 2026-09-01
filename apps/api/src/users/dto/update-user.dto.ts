@@ -45,5 +45,9 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsBoolean()
+  isDefaultFollowUpUser?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

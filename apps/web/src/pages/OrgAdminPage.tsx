@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type AuditLogEntryDto, type BranchDto, type MemberDto, type UserDto } from "@life-mmp/shared";
+import { ORG_ASSIGNABLE_ROLES, LeadershipRole, Role, type AuditLogEntryDto, type BranchDto, type MeetingCategoryDto, type MemberDto, type UserDto } from "@life-mmp/shared";
 import { api, ApiError } from "../lib/api";
 import { EditIcon, IconButton, TrashIcon } from "../components/icons";
 import { useTerminology } from "../hooks/useTerminology";
@@ -111,6 +111,12 @@ export function OrgAdminPage() {
   const [resetSendingId, setResetSendingId] = useState<string | null>(null);
   const [resetSentId, setResetSentId] = useState<string | null>(null);
 
+  const [categories, setCategories] = useState<MeetingCategoryDto[]>([]);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<Role>(Role.FELLOWSHIP_LEADER);
@@ -120,14 +126,16 @@ export function OrgAdminPage() {
   const [userMessage, setUserMessage] = useState<string | null>(null);
 
   async function loadAll() {
-    const [b, m, u] = await Promise.all([
+    const [b, m, u, c] = await Promise.all([
       api.get<BranchDto[]>("/branches"),
       api.get<MemberDto[]>("/members"),
       api.get<UserDto[]>("/users"),
+      api.get<MeetingCategoryDto[]>("/meeting-categories"),
     ]);
     setBranches(b);
     setMembers(m);
     setUsers(u);
+    setCategories(c);
   }
 
   useEffect(() => {
@@ -187,6 +195,34 @@ export function OrgAdminPage() {
         [b.id]: err instanceof ApiError ? err.message : "Couldn't file the deletion request.",
       }));
     }
+  }
+
+  async function onCreateCategory(e: FormEvent) {
+    e.preventDefault();
+    setCategoryError(null);
+    try {
+      await api.post("/meeting-categories", { name: categoryName });
+      setCategoryName("");
+      await loadAll();
+    } catch (err) {
+      setCategoryError(err instanceof ApiError ? err.message : "Something went wrong.");
+    }
+  }
+
+  function startEditCategory(c: MeetingCategoryDto) {
+    setEditingCategoryId(c.id);
+    setEditCategoryName(c.name);
+  }
+
+  async function saveCategoryEdit(id: string) {
+    await api.patch(`/meeting-categories/${id}`, { name: editCategoryName });
+    setEditingCategoryId(null);
+    await loadAll();
+  }
+
+  async function toggleCategoryActive(c: MeetingCategoryDto) {
+    await api.patch(`/meeting-categories/${c.id}`, { isActive: !c.isActive });
+    await loadAll();
   }
 
   function startEditUser(u: UserDto) {
@@ -259,6 +295,11 @@ export function OrgAdminPage() {
 
   async function onToggleDevotionalEditorGrant(u: UserDto) {
     const updated = await api.patch<UserDto>(`/users/${u.id}`, { isDevotionalEditor: !u.isDevotionalEditor });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+  }
+
+  async function onToggleDefaultFollowUpUserGrant(u: UserDto) {
+    const updated = await api.patch<UserDto>(`/users/${u.id}`, { isDefaultFollowUpUser: !u.isDefaultFollowUpUser });
     setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
   }
 
@@ -442,6 +483,90 @@ export function OrgAdminPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section>
+        <h1 className="text-xl font-semibold mb-1">Meeting categories</h1>
+        <p className="text-sm mb-4" style={{ color: "var(--ink-muted)" }}>
+          The recurring meeting types your church runs (Sunday Service, Midweek Service, Cell
+          Fellowship, Worship Evening, ...). Pick one when starting an Attendance session or
+          creating an Event so repeat absenteeism can be tracked per meeting type.
+        </p>
+
+        <form
+          onSubmit={onCreateCategory}
+          className="rounded-xl border p-4 mb-4 flex gap-2"
+          style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+        >
+          <input
+            required
+            placeholder="e.g. Cell Fellowship"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            className="flex-1 rounded-md border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--line)" }}
+          />
+          <button
+            type="submit"
+            className="rounded-md px-4 py-2 text-sm font-medium"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            Add
+          </button>
+        </form>
+        {categoryError && (
+          <div className="mb-4 rounded-md px-3 py-2 text-sm" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+            {categoryError}
+          </div>
+        )}
+
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
+          {categories.length === 0 && (
+            <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>
+              No meeting categories yet.
+            </div>
+          )}
+          {categories.map((c) => (
+            <div key={c.id} className="px-4 py-3 border-t first:border-t-0 flex items-center justify-between text-sm" style={{ borderColor: "var(--line-soft)" }}>
+              {editingCategoryId === c.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    value={editCategoryName}
+                    onChange={(e) => setEditCategoryName(e.target.value)}
+                    className="flex-1 rounded-md border px-2 py-1.5 text-sm"
+                    style={{ borderColor: "var(--line)" }}
+                  />
+                  <button type="button" onClick={() => saveCategoryEdit(c.id)} className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setEditingCategoryId(null)} className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span style={{ color: c.isActive ? "var(--ink)" : "var(--ink-muted)" }}>
+                    {c.name}
+                    {!c.isActive && " (inactive)"}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleCategoryActive(c)}
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={{ background: "var(--surface-2)", color: "var(--ink-muted)" }}
+                    >
+                      {c.isActive ? "Deactivate" : "Reactivate"}
+                    </button>
+                    <IconButton title="Rename" onClick={() => startEditCategory(c)}>
+                      <EditIcon />
+                    </IconButton>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -708,6 +833,19 @@ export function OrgAdminPage() {
                       }
                     >
                       {u.isDevotionalEditor ? `${terms.devotional} editor ✓` : `Make ${terms.devotional.toLowerCase()} editor`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleDefaultFollowUpUserGrant(u)}
+                      title="Auto-generated follow-ups (repeat absenteeism, a walk-in's 3rd visit) get assigned to whichever default follow-up user currently has the fewest pending"
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={
+                        u.isDefaultFollowUpUser
+                          ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                          : { background: "var(--surface-2)", color: "var(--ink-muted)" }
+                      }
+                    >
+                      {u.isDefaultFollowUpUser ? "Default follow-up ✓" : "Make default follow-up"}
                     </button>
                 </div>
               )}

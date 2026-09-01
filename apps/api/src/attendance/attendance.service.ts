@@ -1,9 +1,74 @@
+import { randomUUID } from "crypto";
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
+import { pickDefaultFollowUpAssignee } from "../follow-ups/default-assignee";
 import { CreateAttendanceSessionDto } from "./dto/create-session.dto";
 import { CheckInDto } from "./dto/check-in.dto";
 import { LinkMemberDto } from "./dto/link-member.dto";
+
+const REPEAT_WALKIN_THRESHOLD = 3;
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^\d+]/g, "");
+}
+
+/** Auto-registers a repeat walk-in as a real (VISITOR-status) Member once
+ * the same phone number has checked in, with no member match, at
+ * REPEAT_WALKIN_THRESHOLD distinct sessions -- "automatically track
+ * visitors ... those members that are first entered as walk-ins" (Sep
+ * 2026). Every one of their past walk-in records is retroactively linked to
+ * the new Member too, so their attendance history follows them once
+ * converted; a follow-up is created so someone actually reaches out about
+ * formally registering them, rather than this happening silently. Skipped
+ * entirely if a Member with this phone already exists -- staff may have
+ * already linked/registered them manually, and this never overrides that. */
+async function maybeConvertRepeatWalkIn(
+  tx: any,
+  organizationId: string,
+  visitorPhone: string | null | undefined,
+  visitorName: string | null | undefined,
+) {
+  if (!visitorPhone) return;
+  const normalized = normalizePhone(visitorPhone);
+  if (!normalized) return;
+
+  const existingMember = await tx.member.findFirst({ where: { organizationId, phone: normalized } });
+  if (existingMember) return;
+
+  const walkIns: { id: string; sessionId: string; visitorPhone: string | null }[] = await tx.attendanceRecord.findMany({
+    where: { organizationId, memberId: null, visitorPhone: { not: null } },
+    select: { id: true, sessionId: true, visitorPhone: true },
+  });
+  const matches = walkIns.filter((r) => r.visitorPhone && normalizePhone(r.visitorPhone) === normalized);
+  const distinctSessions = new Set(matches.map((r) => r.sessionId));
+  if (distinctSessions.size < REPEAT_WALKIN_THRESHOLD) return;
+
+  const member = await tx.member.create({
+    data: {
+      organizationId,
+      fullName: visitorName?.trim() || "Walk-in visitor",
+      phone: normalized,
+      status: "VISITOR",
+      originatedAsWalkIn: true,
+    },
+  });
+  await tx.attendanceRecord.updateMany({
+    where: { id: { in: matches.map((r) => r.id) } },
+    data: { memberId: member.id },
+  });
+
+  const assignedToId = await pickDefaultFollowUpAssignee(tx, organizationId);
+  await tx.followUp.create({
+    data: {
+      id: randomUUID(),
+      organizationId,
+      memberId: member.id,
+      assignedToId,
+      notes: `Checked in as a walk-in ${distinctSessions.size} times -- may be ready to be registered as a full member.`,
+    },
+  });
+}
 
 /** Same person, same session, twice -- whichever check-in got there first
  * wins; the second tap/scan just returns that existing record instead of
@@ -32,6 +97,7 @@ export class AttendanceService {
           branchId: dto.branchId,
           eventId: dto.eventId,
           classId: dto.classId,
+          categoryId: dto.categoryId,
           name: dto.name,
           date: new Date(dto.date),
         },
@@ -73,7 +139,7 @@ export class AttendanceService {
       if (existingById) return existingById;
       const duplicate = await findDuplicate(tx, sessionId, memberId, visitorName);
       if (duplicate) return duplicate;
-      return tx.attendanceRecord.create({
+      const record = await tx.attendanceRecord.create({
         data: {
           id,
           organizationId: ctx.organizationId as string,
@@ -83,6 +149,8 @@ export class AttendanceService {
           visitorPhone,
         },
       });
+      if (!memberId) await maybeConvertRepeatWalkIn(tx, ctx.organizationId as string, visitorPhone, visitorName);
+      return record;
     });
   }
 
@@ -163,7 +231,7 @@ export class AttendanceService {
         if (existingById) return existingById;
         const duplicate = await findDuplicate(tx, session.id, memberId, visitorName);
         if (duplicate) return duplicate;
-        return tx.attendanceRecord.create({
+        const record = await tx.attendanceRecord.create({
           data: {
             id,
             organizationId: session.organizationId,
@@ -173,6 +241,8 @@ export class AttendanceService {
             visitorPhone,
           },
         });
+        if (!memberId) await maybeConvertRepeatWalkIn(tx, session.organizationId, visitorPhone, visitorName);
+        return record;
       },
     );
   }

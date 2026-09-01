@@ -1,17 +1,28 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import type { AttendanceSessionDto } from "@life-mmp/shared";
+import type { AttendanceSessionDto, MeetingCategoryDto } from "@life-mmp/shared";
 import { api } from "../lib/api";
 
 type SessionWithCount = AttendanceSessionDto & { _count: { records: number } };
 
+const CUSTOM_OPTION = "__custom__";
+
 export function AttendancePage() {
   const [sessions, setSessions] = useState<SessionWithCount[]>([]);
-  const [name, setName] = useState("Sunday Service");
+  const [categories, setCategories] = useState<MeetingCategoryDto[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [customName, setCustomName] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
 
   async function load() {
-    setSessions(await api.get<SessionWithCount[]>("/attendance/sessions"));
+    const [sessionList, categoryList] = await Promise.all([
+      api.get<SessionWithCount[]>("/attendance/sessions"),
+      api.get<MeetingCategoryDto[]>("/meeting-categories"),
+    ]);
+    setSessions(sessionList);
+    const active = categoryList.filter((c) => c.isActive);
+    setCategories(active);
+    setCategoryId((current) => current || active[0]?.id || CUSTOM_OPTION);
   }
 
   useEffect(() => {
@@ -20,7 +31,14 @@ export function AttendancePage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    await api.post("/attendance/sessions", { name, date: new Date(date).toISOString() });
+    const category = categories.find((c) => c.id === categoryId);
+    const name = category ? category.name : customName;
+    await api.post("/attendance/sessions", {
+      name,
+      date: new Date(date).toISOString(),
+      categoryId: category ? category.id : undefined,
+    });
+    setCustomName("");
     load();
   }
 
@@ -37,15 +55,35 @@ export function AttendancePage() {
         style={{ borderColor: "var(--line)", background: "var(--surface)" }}
       >
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-sm mb-1">Name</label>
-          <input
+          <label className="block text-sm mb-1">Meeting</label>
+          <select
             required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
             className="w-full rounded-md border px-3 py-2 text-sm"
             style={{ borderColor: "var(--line)" }}
-          />
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value={CUSTOM_OPTION}>Other (spot meeting)</option>
+          </select>
         </div>
+        {categoryId === CUSTOM_OPTION && (
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-sm mb-1">Name</label>
+            <input
+              required
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              placeholder="e.g. Youth camp check-in"
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </div>
+        )}
         <div>
           <label className="block text-sm mb-1">Date</label>
           <input
@@ -65,6 +103,12 @@ export function AttendancePage() {
           Start session
         </button>
       </form>
+      {categories.length === 0 && (
+        <p className="text-xs mb-4" style={{ color: "var(--ink-muted)" }}>
+          No meeting types set up yet -- add some under Setup → Organization Admin → Meeting
+          categories to track repeat absenteeism per meeting type, or just use "Other" for now.
+        </p>
+      )}
 
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
         {sessions.length === 0 && (

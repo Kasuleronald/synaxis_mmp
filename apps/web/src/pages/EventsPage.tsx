@@ -5,6 +5,7 @@ import {
   RecurrenceFrequency,
   type EventDebriefDto,
   type EventDto,
+  type MeetingCategoryDto,
 } from "@life-mmp/shared";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, IconButton } from "../components/icons";
@@ -46,6 +47,7 @@ function toLocalInputValue(iso: string): string {
 
 export function EventsPage() {
   const [events, setEvents] = useState<EventDto[]>([]);
+  const [categories, setCategories] = useState<MeetingCategoryDto[]>([]);
   const [monthAnchor, setMonthAnchor] = useState(() => startOfMonth(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export function EventsPage() {
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<RecurrenceFrequency>("WEEKLY");
   const [repeatUntil, setRepeatUntil] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -75,7 +78,12 @@ export function EventsPage() {
   const [viewedDebrief, setViewedDebrief] = useState<EventDebriefDto | null>(null);
 
   async function load() {
-    setEvents(await api.get<EventDto[]>("/events"));
+    const [eventList, categoryList] = await Promise.all([
+      api.get<EventDto[]>("/events"),
+      api.get<MeetingCategoryDto[]>("/meeting-categories"),
+    ]);
+    setEvents(eventList);
+    setCategories(categoryList.filter((c) => c.isActive));
   }
 
   useEffect(() => {
@@ -116,6 +124,7 @@ export function EventsPage() {
     setRepeats(false);
     setFrequency("WEEKLY");
     setRepeatUntil("");
+    setCategoryId("");
     setShowCreate(true);
   }
 
@@ -129,6 +138,7 @@ export function EventsPage() {
         location: location || undefined,
         startsAt: new Date(startsAt).toISOString(),
         endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+        categoryId: categoryId || undefined,
         recurrence: repeats && repeatUntil ? { frequency, until: new Date(repeatUntil).toISOString() } : undefined,
       });
       setShowCreate(false);
@@ -486,6 +496,25 @@ export function EventsPage() {
                 style={{ borderColor: "var(--line)" }}
               />
             </div>
+
+            {categories.length > 0 && (
+              <div>
+                <label className="block text-sm mb-1">Meeting category (optional)</label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  <option value="">None</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="rounded-md border p-3" style={{ borderColor: "var(--line)" }}>
               <label className="flex items-center gap-2 text-sm mb-1">

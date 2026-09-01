@@ -2,8 +2,14 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (5) (Password self-service, org-admin staff password reset, and the Members export gap -- see the newest section right below)
+**Last updated:** 2026-09-01 (6) (Meeting categories, repeat-absenteeism tracking, and automatic walk-in-to-member conversion -- see the newest section right below)
 
+## 2026-09-01 (6) — Meeting categories, repeat absenteeism, and repeat walk-ins
+
+- **Meeting categories** (Setup → Organization Admin) -- define your church's recurring meeting types (Sunday Service, Midweek Service, Cell Fellowship, Worship Evening, ...). Starting an Attendance session now picks from this list instead of typing a free-text name each time (an "Other (spot meeting)" option still covers one-off events); creating an Event can optionally tag it with a category too, so a recurring calendar-driven meeting feeds the same tracking below.
+- **Repeat absenteeism is tracked per meeting category.** Once someone has attended a category before, missing the next 3 sessions of that same category in a row automatically files a follow-up -- assigned to whichever "default follow-up user" currently has the fewest pending (Staff & roles → "Make default follow-up", can be more than one person). Someone who's simply never attended a given meeting type is never flagged for missing it.
+- **A walk-in who checks in 3 times without ever being registered is now automatically turned into a real Member** (matched by phone number across their walk-in visits), with their full past attendance history linked to the new record, and a follow-up filed so someone actually reaches out about registering them properly.
+- Checked twice a day in the background (same plain-interval approach as the existing birthday reminders) -- no cron dependency added.
 ## 2026-09-01 (5) — Password change, admin-triggered resets by email, and a members-export fix
 
 - **Anyone can now change their own password** -- a "Change password" option in the profile menu (top right), asking for the current password plus a new one.

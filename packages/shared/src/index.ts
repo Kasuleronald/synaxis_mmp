@@ -184,6 +184,7 @@ export interface UserDto {
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
   isDevotionalEditor: boolean;
+  isDefaultFollowUpUser: boolean;
   avatarAssetId: string | null;
 }
 
@@ -360,6 +361,7 @@ export interface MemberDto {
   email: string | null;
   address: string | null;
   status: MemberStatus;
+  originatedAsWalkIn: boolean;
   leadershipRoles: LeadershipRole[];
   notes: string | null;
   joinedAt: string | null;
@@ -439,6 +441,7 @@ export interface EventDto {
   startsAt: string;
   endsAt: string | null;
   recurrenceGroupId?: string | null;
+  categoryId?: string | null;
   debrief?: { id: string } | null;
   // The auto-created attendance session behind this event's public
   // registration link (/checkin/:qrToken) -- always present once created.
@@ -461,6 +464,7 @@ export interface CreateEventInput {
   location?: string;
   startsAt: string;
   endsAt?: string;
+  categoryId?: string;
   recurrence?: { frequency: RecurrenceFrequency; until: string };
 }
 
@@ -499,6 +503,7 @@ export interface AttendanceSessionDto {
   branchId: string | null;
   eventId: string | null;
   classId: string | null;
+  categoryId: string | null;
   name: string;
   date: string;
   qrToken: string;
@@ -509,8 +514,28 @@ export interface CreateAttendanceSessionInput {
   branchId?: string;
   eventId?: string;
   classId?: string;
+  categoryId?: string;
   name: string;
   date: string;
+}
+
+/// Admin-defined recurring meeting types (Sunday Service, Cell Fellowship,
+/// ...) -- see MeetingCategory in schema.prisma.
+export interface MeetingCategoryDto {
+  id: string;
+  organizationId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateMeetingCategoryInput {
+  name: string;
+}
+
+export interface UpdateMeetingCategoryInput {
+  name?: string;
+  isActive?: boolean;
 }
 
 export interface AttendanceRecordDto {
