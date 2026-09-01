@@ -3,9 +3,13 @@ import { Link } from "react-router-dom";
 import {
   RECURRENCE_FREQUENCY_LABELS,
   RecurrenceFrequency,
+  WEEKDAY_NAMES,
+  WEEKDAY_ORDINALS,
+  WEEKDAY_ORDINAL_LABELS,
   type EventDebriefDto,
   type EventDto,
   type MeetingCategoryDto,
+  type WeekdayOrdinal,
 } from "@life-mmp/shared";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, IconButton } from "../components/icons";
@@ -60,6 +64,8 @@ export function EventsPage() {
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<RecurrenceFrequency>("WEEKLY");
   const [repeatUntil, setRepeatUntil] = useState("");
+  const [weekday, setWeekday] = useState(5);
+  const [ordinals, setOrdinals] = useState<WeekdayOrdinal[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -124,12 +130,30 @@ export function EventsPage() {
     setRepeats(false);
     setFrequency("WEEKLY");
     setRepeatUntil("");
+    setWeekday(withTime.getDay());
+    setOrdinals([]);
     setCategoryId("");
     setShowCreate(true);
   }
 
+  function onFrequencyChange(next: RecurrenceFrequency) {
+    setFrequency(next);
+    // Default the weekday picker to whatever day the chosen start date
+    // actually falls on -- "every 1st/2nd/3rd Friday" only makes sense
+    // starting from a Friday-shaped default, not last month's leftover pick.
+    if (next === "MONTHLY_WEEKDAY" && startsAt) setWeekday(new Date(startsAt).getDay());
+  }
+
+  function toggleOrdinal(ordinal: WeekdayOrdinal) {
+    setOrdinals((prev) => (prev.includes(ordinal) ? prev.filter((o) => o !== ordinal) : [...prev, ordinal]));
+  }
+
   async function onSubmitCreate(e: FormEvent) {
     e.preventDefault();
+    if (repeats && frequency === "MONTHLY_WEEKDAY" && ordinals.length === 0) {
+      setCreateError("Pick at least one occurrence (1st, 2nd, 3rd, 4th, or Last) for the monthly-by-weekday repeat.");
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
@@ -139,7 +163,14 @@ export function EventsPage() {
         startsAt: new Date(startsAt).toISOString(),
         endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
         categoryId: categoryId || undefined,
-        recurrence: repeats && repeatUntil ? { frequency, until: new Date(repeatUntil).toISOString() } : undefined,
+        recurrence:
+          repeats && repeatUntil
+            ? {
+                frequency,
+                until: new Date(repeatUntil).toISOString(),
+                ...(frequency === "MONTHLY_WEEKDAY" ? { weekday, ordinals } : {}),
+              }
+            : undefined,
       });
       setShowCreate(false);
       await load();
@@ -525,7 +556,7 @@ export function EventsPage() {
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <select
                     value={frequency}
-                    onChange={(e) => setFrequency(e.target.value as RecurrenceFrequency)}
+                    onChange={(e) => onFrequencyChange(e.target.value as RecurrenceFrequency)}
                     className="rounded-md border px-2 py-1.5 text-sm"
                     style={{ borderColor: "var(--line)" }}
                   >
@@ -544,6 +575,47 @@ export function EventsPage() {
                     className="rounded-md border px-2 py-1.5 text-sm"
                     style={{ borderColor: "var(--line)" }}
                   />
+                  {frequency === "MONTHLY_WEEKDAY" && (
+                    <div className="col-span-2 grid gap-2">
+                      <select
+                        value={weekday}
+                        onChange={(e) => setWeekday(Number(e.target.value))}
+                        className="rounded-md border px-2 py-1.5 text-sm"
+                        style={{ borderColor: "var(--line)" }}
+                      >
+                        {WEEKDAY_NAMES.map((name, i) => (
+                          <option key={name} value={i}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex flex-wrap gap-2">
+                        {WEEKDAY_ORDINALS.map((ordinal) => (
+                          <label
+                            key={ordinal}
+                            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                            style={
+                              ordinals.includes(ordinal)
+                                ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                                : { background: "var(--surface-2)", color: "var(--ink-muted)" }
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              className="hidden"
+                              checked={ordinals.includes(ordinal)}
+                              onChange={() => toggleOrdinal(ordinal)}
+                            />
+                            {WEEKDAY_ORDINAL_LABELS[ordinal]}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+                        e.g. tick 1st, 2nd, 3rd &amp; 4th for "every {WEEKDAY_NAMES[weekday]} except the last one" and
+                        just "Last" for the month's final {WEEKDAY_NAMES[weekday]}.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

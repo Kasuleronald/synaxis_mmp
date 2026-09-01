@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { WeekdayOrdinal } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -15,6 +16,70 @@ const DEBRIEF_INCLUDE = {
 // so a mistyped "until" decades out can't silently generate thousands of
 // rows (and attendance sessions to match) in one request.
 const MAX_OCCURRENCES = 104;
+// Backstop on the month-scanning loop itself for MONTHLY_WEEKDAY (below) --
+// belt-and-braces alongside MAX_OCCURRENCES, since that loop walks calendar
+// months rather than counting occurrences directly.
+const MAX_MONTHS_SCANNED = 1000;
+
+/** The date of the Nth (1-4) or last (-1) occurrence of `weekday` (0=Sun) in
+ * a given month -- null if that ordinal doesn't exist (e.g. a 5th Friday in
+ * a month that only has four). */
+function nthWeekdayOfMonth(year: number, month: number, weekday: number, ordinal: WeekdayOrdinal): Date | null {
+  if (ordinal === -1) {
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const diff = (lastDayOfMonth.getDay() - weekday + 7) % 7;
+    lastDayOfMonth.setDate(lastDayOfMonth.getDate() - diff);
+    return lastDayOfMonth;
+  }
+  const firstDayOfMonth = new Date(year, month, 1);
+  const diff = (weekday - firstDayOfMonth.getDay() + 7) % 7;
+  const candidate = new Date(year, month, 1 + diff + (ordinal - 1) * 7);
+  return candidate.getMonth() === month ? candidate : null;
+}
+
+/** "Every 1st/2nd/3rd Friday" and/or "every last Friday" of the month (Sep
+ * 2026) -- ordinals are scanned together per month (sorted), so picking
+ * several at once (e.g. 1st+2nd+3rd+4th) produces one occurrence per match,
+ * not a separate series per ordinal. */
+function computeMonthlyWeekdayOccurrences(
+  startsAt: Date,
+  until: Date,
+  weekday: number,
+  ordinals: WeekdayOrdinal[],
+  durationMs: number | null,
+): { startsAt: Date; endsAt: Date | null }[] {
+  const occurrences: { startsAt: Date; endsAt: Date | null }[] = [];
+  let year = startsAt.getFullYear();
+  let month = startsAt.getMonth();
+
+  for (let scanned = 0; scanned < MAX_MONTHS_SCANNED; scanned++) {
+    const datesThisMonth = ordinals
+      .map((ordinal) => nthWeekdayOfMonth(year, month, weekday, ordinal))
+      .filter((d): d is Date => d !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    for (const date of datesThisMonth) {
+      const occurrence = new Date(date);
+      occurrence.setHours(startsAt.getHours(), startsAt.getMinutes(), startsAt.getSeconds(), startsAt.getMilliseconds());
+      if (occurrence < startsAt) continue;
+      if (occurrence > until) return occurrences;
+      if (occurrences.length >= MAX_OCCURRENCES) {
+        throw new BadRequestException(`That repeats into more than ${MAX_OCCURRENCES} events -- pick a nearer end date.`);
+      }
+      occurrences.push({
+        startsAt: occurrence,
+        endsAt: durationMs != null ? new Date(occurrence.getTime() + durationMs) : null,
+      });
+    }
+
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return occurrences;
+}
 
 /** One row per occurrence, each keeping the original's time-of-day and
  * duration -- a plain one-off event is just the degenerate one-occurrence
@@ -31,6 +96,16 @@ function computeOccurrences(
     throw new BadRequestException("The recurrence end date can't be before the event's own start.");
   }
   const durationMs = endsAt ? endsAt.getTime() - startsAt.getTime() : null;
+
+  if (recurrence.frequency === "MONTHLY_WEEKDAY") {
+    return computeMonthlyWeekdayOccurrences(
+      startsAt,
+      until,
+      recurrence.weekday as number,
+      recurrence.ordinals as WeekdayOrdinal[],
+      durationMs,
+    );
+  }
 
   const occurrences: { startsAt: Date; endsAt: Date | null }[] = [];
   const cursor = new Date(startsAt);

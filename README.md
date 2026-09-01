@@ -2,8 +2,13 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (6) (Meeting categories, repeat-absenteeism tracking, and automatic walk-in-to-member conversion -- see the newest section right below)
+**Last updated:** 2026-09-01 (7) (Monthly-by-weekday event recurrence, a Dashboard fix, and a wider audit-log sweep -- see the newest section right below)
 
+## 2026-09-01 (7) — "Every 1st/2nd/3rd Friday" recurrence, Dashboard fix, more audit coverage
+
+- **Events can now repeat on a specific weekday-of-month** -- "every 1st, 2nd, 3rd Friday" and/or "every last Friday", picked independently (tick any combination of 1st/2nd/3rd/4th/Last). Covers real schedules a plain date-of-month recurrence can't, e.g. worship evenings on the month's first three Fridays plus a separate overnight on the last one -- two events, two recurring series, no manual monthly editing either way.
+- **Fixed:** the Dashboard's "Upcoming events" widget was dropping today's own events off the list once their time-of-day had already passed earlier the same day (it compared against the exact current instant, not the start of today) -- today's events now stay visible all day.
+- **Audit log coverage extended** to assets, fixed assets (including condition/edit requests), announcements, testimonies, devotionals, soul winning, branches, organizations, and self-registration approve/reject -- 27 more mutating routes across 11 controllers now leave a trail.
 ## 2026-09-01 (6) — Meeting categories, repeat absenteeism, and repeat walk-ins
 
 - **Meeting categories** (Setup → Organization Admin) -- define your church's recurring meeting types (Sunday Service, Midweek Service, Cell Fellowship, Worship Evening, ...). Starting an Attendance session now picks from this list instead of typing a free-text name each time (an "Other (spot meeting)" option still covers one-off events); creating an Event can optionally tag it with a category too, so a recurring calendar-driven meeting feeds the same tracking below.

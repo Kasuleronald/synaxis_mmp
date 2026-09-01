@@ -448,14 +448,34 @@ export interface EventDto {
   attendanceSessions?: { id: string; qrToken: string }[];
 }
 
-export const RECURRENCE_FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY"] as const;
+export const RECURRENCE_FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY", "MONTHLY_WEEKDAY"] as const;
 export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
 
 export const RECURRENCE_FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
   DAILY: "Daily",
   WEEKLY: "Weekly",
   MONTHLY: "Monthly",
+  // "Every 1st/2nd/3rd Friday" or "every last Friday" -- covers a whole
+  // class of real church schedules a plain date-of-month can't (Sep 2026:
+  // "worship evenings every 1st, 2nd, 3rd (or 4th if exists) Friday... an
+  // overnight every last Friday").
+  MONTHLY_WEEKDAY: "Monthly (by weekday)",
 };
+
+// 1..4 = the 1st..4th occurrence of the chosen weekday in the month; -1 =
+// whichever occurrence is the LAST one that month (the 4th some months, the
+// 5th in months that have five of that weekday).
+export const WEEKDAY_ORDINALS = [1, 2, 3, 4, -1] as const;
+export type WeekdayOrdinal = (typeof WEEKDAY_ORDINALS)[number];
+export const WEEKDAY_ORDINAL_LABELS: Record<WeekdayOrdinal, string> = {
+  1: "1st",
+  2: "2nd",
+  3: "3rd",
+  4: "4th",
+  [-1]: "Last",
+};
+
+export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export interface CreateEventInput {
   branchId?: string;
@@ -465,7 +485,13 @@ export interface CreateEventInput {
   startsAt: string;
   endsAt?: string;
   categoryId?: string;
-  recurrence?: { frequency: RecurrenceFrequency; until: string };
+  recurrence?: {
+    frequency: RecurrenceFrequency;
+    until: string;
+    // Required only when frequency is MONTHLY_WEEKDAY.
+    weekday?: number; // 0 = Sunday .. 6 = Saturday
+    ordinals?: WeekdayOrdinal[];
+  };
 }
 
 /** Filed once an event has actually happened -- a concrete report type of

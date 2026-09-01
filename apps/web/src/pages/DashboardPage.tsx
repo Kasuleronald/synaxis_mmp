@@ -206,7 +206,15 @@ export function DashboardPage() {
       .catch(() => {});
     api
       .get<EventDto[]>("/events")
-      .then((events) => setUpcomingEvents(events.filter((e) => new Date(e.startsAt) >= new Date()).slice(0, 5)))
+      .then((events) => {
+        // Today's own events still count as "upcoming" even if their time
+        // has already passed earlier today -- only actually-past days drop
+        // off, not actually-past hours (Sep 2026: an event was disappearing
+        // from this widget the same day it was happening).
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        setUpcomingEvents(events.filter((e) => new Date(e.startsAt) >= todayStart).slice(0, 5));
+      })
       .catch(() => {});
     if (canSeeGiving) {
       api.get<GivingSummaryDto>("/giving/summary").then(setGivingSummary).catch(() => {});
