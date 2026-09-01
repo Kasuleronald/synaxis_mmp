@@ -1,4 +1,14 @@
-import { IsDateString, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { IsDateString, IsIn, IsOptional, IsString, IsUUID, MinLength, ValidateNested } from "class-validator";
+import { RECURRENCE_FREQUENCIES, RecurrenceFrequency } from "@life-mmp/shared";
+
+class RecurrenceDto {
+  @IsIn(RECURRENCE_FREQUENCIES)
+  frequency!: RecurrenceFrequency;
+
+  @IsDateString()
+  until!: string;
+}
 
 export class CreateEventDto {
   @IsOptional()
@@ -23,4 +33,9 @@ export class CreateEventDto {
   @IsOptional()
   @IsDateString()
   endsAt?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RecurrenceDto)
+  recurrence?: RecurrenceDto;
 }

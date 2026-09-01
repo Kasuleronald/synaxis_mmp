@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
 import { optimizeImage } from "../lib/optimizeImage";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 const AVATAR_MAX_DIMENSION = 512;
 
@@ -18,6 +19,7 @@ export function Avatar() {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -132,9 +134,21 @@ export function Avatar() {
                 Remove photo
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                setShowChangePassword(true);
+                setOpen(false);
+              }}
+              className="rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+            >
+              Change password
+            </button>
           </div>
         </div>
       )}
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 }

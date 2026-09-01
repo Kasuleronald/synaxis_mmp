@@ -50,6 +50,10 @@ export class OrganizationsService {
           fullName: dto.orgAdmin.fullName,
           passwordHash,
           role: Role.ORG_ADMIN,
+          // Same "first login forces a real password" policy as a staff
+          // invite (Sep 2026) -- only the Platform Admin who just typed
+          // this temporary password in sees it.
+          mustChangePassword: true,
         },
       });
 
@@ -96,10 +100,11 @@ export class OrganizationsService {
     return runWithTenant(this.prisma, ctx, (tx) => tx.organization.update({ where: { id }, data: { isSuspended } }));
   }
 
-  /** Platform Admin only -- "no forgot password option yet" workaround.
-   * Targets the org's earliest-created ORG_ADMIN (normally the one made
-   * alongside the org itself); returns a link for the Platform Admin to
-   * relay directly, since there's no email sending to do it automatically. */
+  /** Platform Admin only. Targets the org's earliest-created ORG_ADMIN
+   * (normally the one made alongside the org itself); the reset link is
+   * emailed straight to that admin, never handed back to the Platform Admin
+   * who triggered it (Sep 2026 -- "should only send... not themselves see
+   * the reset"). */
   async generateAdminResetLink(ctx: TenantContext, orgId: string) {
     const admin = await runWithTenant(this.prisma, ctx, (tx) =>
       tx.user.findFirst({
@@ -108,7 +113,6 @@ export class OrganizationsService {
       }),
     );
     if (!admin) throw new NotFoundException("This organization has no admin to reset");
-    const { email, token } = await this.auth.generateResetLinkForUser(admin.id);
-    return { email, token };
+    return this.auth.sendResetEmailForUser(admin.id);
   }
 }

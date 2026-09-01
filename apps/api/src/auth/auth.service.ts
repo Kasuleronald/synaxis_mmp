@@ -4,12 +4,16 @@ import * as bcrypt from "bcryptjs";
 import { SessionUser } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant } from "../prisma/tenant";
+import { EmailService } from "../email/email.service";
 
 const RESET_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   async validateUser(email: string, password: string): Promise<SessionUser> {
     // No org context exists yet for a login attempt -- this is the one place
@@ -56,11 +60,12 @@ export class AuthService {
     return user ? toSessionUser(user) : null;
   }
 
-  /** No email sending exists yet -- this hands back a link for whoever
-   * triggered it (a Platform Admin, from the org's own screen) to relay
-   * directly, the same "copy the link yourself" pattern as the public
-   * registration link. */
-  async generateResetLinkForUser(userId: string): Promise<{ email: string; token: string }> {
+  /** Emails the reset link straight to the account holder (Sep 2026: "the
+   * admin should only send the reset password to the email of the user and
+   * not themselves see the reset") -- whoever triggered this (a Platform
+   * Admin resetting an Org Admin, or an Org Admin resetting their own staff)
+   * never sees the token or link itself, only whether the send succeeded. */
+  async sendResetEmailForUser(userId: string): Promise<{ email: string }> {
     const token = randomBytes(24).toString("base64url");
     const user = await runWithTenant(
       this.prisma,
@@ -69,10 +74,16 @@ export class AuthService {
         tx.user.update({
           where: { id: userId },
           data: { passwordResetToken: token, passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
-          select: { email: true },
+          select: { email: true, fullName: true },
         }),
     );
-    return { email: user.email, token };
+    const link = `${process.env.WEB_ORIGIN ?? ""}/reset-password/${token}`;
+    this.email.send(
+      user.email,
+      "Reset your Synaxis password",
+      `Hi ${user.fullName},\n\nA password reset was requested for your Synaxis account. Use the link below to set a new password -- it expires in 24 hours and can only be used once:\n\n${link}\n\nIf you didn't expect this, you can ignore this email; your password won't change unless you use the link above.`,
+    );
+    return { email: user.email };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
@@ -88,7 +99,30 @@ export class AuthService {
     await runWithTenant(this.prisma, { organizationId: null, isPlatformAdmin: true }, (tx) =>
       tx.user.update({
         where: { id: user.id },
-        data: { passwordHash, passwordResetToken: null, passwordResetExpiresAt: null },
+        data: { passwordHash, passwordResetToken: null, passwordResetExpiresAt: null, mustChangePassword: false },
+      }),
+    );
+  }
+
+  /** Self-service, from inside the app -- the one path that requires
+   * knowing the current password rather than an emailed token. Also clears
+   * mustChangePassword, so this is what the forced first-login screen calls
+   * too. */
+  async changeOwnPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await runWithTenant(
+      this.prisma,
+      { organizationId: null, isPlatformAdmin: true },
+      (tx) => tx.user.findUnique({ where: { id: userId } }),
+    );
+    if (!user) throw new UnauthorizedException();
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw new BadRequestException("Your current password is incorrect.");
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await runWithTenant(this.prisma, { organizationId: null, isPlatformAdmin: true }, (tx) =>
+      tx.user.update({
+        where: { id: userId },
+        data: { passwordHash, mustChangePassword: false },
       }),
     );
   }
@@ -106,6 +140,7 @@ function toSessionUser(user: {
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
   isDevotionalEditor: boolean;
+  mustChangePassword: boolean;
 }): SessionUser {
   return {
     id: user.id,
@@ -119,5 +154,6 @@ function toSessionUser(user: {
     isPastor: user.isPastor,
     isFellowshipsDepartmentHead: user.isFellowshipsDepartmentHead,
     isDevotionalEditor: user.isDevotionalEditor,
+    mustChangePassword: user.mustChangePassword,
   };
 }

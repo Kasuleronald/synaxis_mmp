@@ -37,10 +37,8 @@ export function OrganizationDialog({
   const [theme, setTheme] = useState<Theme>(org.theme);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resetLink, setResetLink] = useState<string | null>(null);
-  const [resetEmail, setResetEmail] = useState<string | null>(null);
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   async function onSave() {
     setSaving(true);
@@ -61,21 +59,13 @@ export function OrganizationDialog({
     setResetting(true);
     setError(null);
     try {
-      const res = await api.post<{ email: string; token: string }>(`/organizations/${org.id}/admin/reset-link`);
-      setResetEmail(res.email);
-      setResetLink(`${window.location.origin}/reset-password/${res.token}`);
+      const res = await api.post<{ email: string }>(`/organizations/${org.id}/admin/reset-link`);
+      setResetSentTo(res.email);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't generate a reset link.");
+      setError(err instanceof ApiError ? err.message : "Couldn't send the reset email.");
     } finally {
       setResetting(false);
     }
-  }
-
-  function copyResetLink() {
-    if (!resetLink) return;
-    navigator.clipboard.writeText(resetLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
   }
 
   return (
@@ -126,25 +116,12 @@ export function OrganizationDialog({
 
               <div className="pt-4 border-t" style={{ borderColor: "var(--line-soft)" }}>
                 <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>
-                  No forgot-password flow exists yet -- generate a link here and relay it to the
-                  org's admin directly (it is not emailed automatically).
+                  Sends a password reset link straight to this org's admin -- it goes only to
+                  their own email, valid for 24 hours; you won't see the link yourself.
                 </p>
-                {resetLink ? (
-                  <div className="rounded-md border p-3" style={{ borderColor: "var(--line)" }}>
-                    <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>
-                      For {resetEmail} -- valid 24 hours:
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs truncate">{resetLink}</code>
-                      <button
-                        type="button"
-                        onClick={copyResetLink}
-                        className="rounded-md px-3 py-1.5 text-xs font-medium shrink-0"
-                        style={{ background: "var(--accent)", color: "white" }}
-                      >
-                        {copied ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
+                {resetSentTo ? (
+                  <div className="rounded-md border p-3 text-xs" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                    Reset email sent to {resetSentTo}.
                   </div>
                 ) : (
                   <button
@@ -154,7 +131,7 @@ export function OrganizationDialog({
                     className="rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-60"
                     style={{ background: "var(--surface-2)", color: "var(--ink)" }}
                   >
-                    {resetting ? "Generating…" : "Generate password reset link"}
+                    {resetting ? "Sending…" : "Send password reset email"}
                   </button>
                 )}
               </div>

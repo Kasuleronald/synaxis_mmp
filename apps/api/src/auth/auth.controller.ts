@@ -3,8 +3,10 @@ import { AuthGuard } from "@nestjs/passport";
 import { Request, Response } from "express";
 import { SessionUser } from "@life-mmp/shared";
 import { SessionAuthGuard } from "./guards/session-auth.guard";
+import { CurrentUser } from "./decorators/current-user.decorator";
 import { AuthService } from "./auth.service";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuditLogService } from "../audit-log/audit-log.service";
 
 @Controller("auth")
@@ -60,6 +62,18 @@ export class AuthController {
   @HttpCode(200)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.auth.resetPassword(dto.token, dto.newPassword);
+    return { ok: true };
+  }
+
+  /** Self-service, and also what the forced first-login screen calls.
+   * Every request re-deserializes SessionUser from the DB (see
+   * session.serializer.ts), so the frontend's next /auth/me call already
+   * sees mustChangePassword: false with no extra bookkeeping here. */
+  @UseGuards(SessionAuthGuard)
+  @Post("change-password")
+  @HttpCode(200)
+  async changePassword(@CurrentUser() user: SessionUser, @Body() dto: ChangePasswordDto) {
+    await this.auth.changeOwnPassword(user.id, dto.currentPassword, dto.newPassword);
     return { ok: true };
   }
 }

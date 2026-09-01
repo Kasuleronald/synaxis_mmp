@@ -108,6 +108,8 @@ export function OrgAdminPage() {
   const [editUserBranchId, setEditUserBranchId] = useState("");
   const [userEditError, setUserEditError] = useState<string | null>(null);
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
+  const [resetSendingId, setResetSendingId] = useState<string | null>(null);
+  const [resetSentId, setResetSentId] = useState<string | null>(null);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -210,6 +212,17 @@ export function OrgAdminPage() {
       setUserEditError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setUserSavingId(null);
+    }
+  }
+
+  async function onRequestPasswordReset(u: UserDto) {
+    setResetSendingId(u.id);
+    try {
+      await api.post(`/users/${u.id}/reset-password`);
+      setResetSentId(u.id);
+      setTimeout(() => setResetSentId((id) => (id === u.id ? null : id)), 4000);
+    } finally {
+      setResetSendingId(null);
     }
   }
 
@@ -595,9 +608,25 @@ export function OrgAdminPage() {
                       {branches.find((b) => b.id === u.branchId)?.name ?? "No branch"}
                     </div>
                   </div>
-                  <IconButton title="Edit" onClick={() => startEditUser(u)}>
-                    <EditIcon />
-                  </IconButton>
+                  <div className="flex items-center gap-2">
+                    {resetSentId === u.id ? (
+                      <span className="text-xs" style={{ color: "var(--ink-muted)" }}>Reset email sent</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={resetSendingId === u.id}
+                        onClick={() => onRequestPasswordReset(u)}
+                        title="Emails a password reset link directly to this person -- you won't see the link"
+                        className="text-xs underline disabled:opacity-60"
+                        style={{ color: "var(--ink-muted)" }}
+                      >
+                        {resetSendingId === u.id ? "Sending…" : "Reset password"}
+                      </button>
+                    )}
+                    <IconButton title="Edit" onClick={() => startEditUser(u)}>
+                      <EditIcon />
+                    </IconButton>
+                  </div>
                 </div>
               )}
               {u.role !== Role.ORG_ADMIN && editingUserId !== u.id && (

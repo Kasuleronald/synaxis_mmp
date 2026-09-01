@@ -183,11 +183,19 @@ model User {
   // Same appointment model again -- edits the org's Daily Devotional
   // without needing Org Admin access.
   isDevotionalEditor Boolean @default(false)
-  // Set when a Platform Admin generates a reset link for an org's admin
-  // (no email sending yet -- Section: "no forgot password option"). Single
-  // active token, cleared once used or replaced by a newer request.
+  // Set when a Platform Admin or Org Admin generates a reset link for
+  // someone else's account -- emailed straight to that person, never shown
+  // to the admin who triggered it (Sep 2026). Single active token, cleared
+  // once used or replaced by a newer request.
   passwordResetToken      String?   @unique
   passwordResetExpiresAt  DateTime?
+  // True on every account created with an admin-chosen temporary password
+  // (new staff invite, new org's first Org Admin) -- forces a mandatory
+  // "set your own password" screen on next login, before anything else in
+  // the app is reachable. Cleared the moment that password is actually
+  // changed, by whichever path (forced screen, self-service, or an emailed
+  // reset link all clear it the same way).
+  mustChangePassword Boolean @default(false)
   // Self-service profile photo -- reuses the generic Asset blob store (same
   // optimize-in-browser path as Church Assets/condition-report photos)
   // rather than a parallel image column.
@@ -411,6 +419,11 @@ model Event {
   location       String?
   startsAt       DateTime
   endsAt         DateTime?
+  // Shared across every occurrence generated from one "repeats" create --
+  // each occurrence is still its own full Event row (own attendance
+  // session, own debrief), this just marks which ones came from the same
+  // series. Null for a plain one-off event.
+  recurrenceGroupId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -418,6 +431,7 @@ model Event {
   debrief            EventDebrief?
 
   @@index([organizationId])
+  @@index([recurrenceGroupId])
   @@map("events")
 }
 

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { OrgProvider } from "./context/OrgContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Shell } from "./components/Shell";
+import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
@@ -51,6 +52,10 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <CenteredNote text="Loading…" />;
   if (!user) return <Navigate to="/login" replace />;
+  // A temporary password (new staff invite, new org's first admin) blocks
+  // every other screen until it's actually changed -- no dismiss, no way
+  // to click past it (Sep 2026).
+  if (user.mustChangePassword) return <ChangePasswordModal forced onClose={() => {}} />;
   return <Shell>{children}</Shell>;
 }
 

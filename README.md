@@ -2,8 +2,21 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (3) (Every export and import now shows in the audit log -- see the newest section right below)
+**Last updated:** 2026-09-01 (5) (Password self-service, org-admin staff password reset, and the Members export gap -- see the newest section right below)
 
+## 2026-09-01 (5) — Password change, admin-triggered resets by email, and a members-export fix
+
+- **Anyone can now change their own password** -- a "Change password" option in the profile menu (top right), asking for the current password plus a new one.
+- **New accounts must set a real password on first login.** A staff invite or a new org's first Org Admin still gets set up with a temporary password chosen by whoever created the account, but the very first time that account logs in, it's forced into a "set your own password" screen before anything else in the app is reachable.
+- **Org Admin can now reset a staff member's password** ("Reset password" next to Edit, on the Staff & roles screen) -- and, matching the existing Platform-Admin-resets-an-Org-Admin flow, the reset link is emailed straight to that person now instead of being shown to whoever clicked the button. Neither admin ever sees or handles the actual reset link. (Needs SMTP configured -- see `apps/api/.env.example`; without it, in-app notifications still work but reset/notification emails are silently skipped.)
+- **Members export was missing columns that are visible on screen** -- Gender, Address, Number, Household, Fellowship, Added by, Working status, and Joined date weren't in the Excel/PDF export at all. Export now always includes every field the Members table can show, regardless of which columns happen to be toggled on/off on screen at the time.
+- **PDF import limitation clarified in the UI**: a note on the Import Center now explains that a PDF with many columns re-imports less reliably than Excel/CSV, since PDF text extraction loses the original table structure before AI ever sees it -- this isn't new behavior, just a heads-up so "some fields came through blank" isn't a surprise.
+
+## 2026-09-01 (4) — Events redrawn as a month calendar, with recurrence
+
+- **Events is a proper month calendar now** -- big day tiles in a 6-week grid (so the page never jumps height between a 4-week and 6-week month), each tile listing its events directly. Chevron month navigation, a "Today" button, and a "go to date" jump.
+- **Click a day to open it** -- a dialog lists every event that day; click one to expand it in place (attendance link, file/view debrief), independently of the others.
+- **Creating an event now supports an end date/time** (the field already existed on the backend, just was never exposed) **and repeating** -- daily, weekly, or monthly, until a date you pick. Each occurrence is created as its own full event (own attendance link, own debrief), tagged as part of the same series, capped at 104 occurrences so a distant "until" date can't silently generate an unreasonable number of events.
 ## 2026-09-01 (3) — Exports and imports in the audit log
 
 - **Every file export now shows in the audit log** -- the Members list (Excel/PDF), every Reports card's Excel export, and Attendance list downloads (Excel/PDF) all record who exported what, since exports have no backend request of their own to hook into otherwise.

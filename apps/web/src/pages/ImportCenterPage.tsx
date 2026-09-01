@@ -90,6 +90,11 @@ export function ImportCenterPage() {
           </button>{" "}
           <span style={{ color: "var(--ink-muted)" }}>if you're starting from scratch.</span>
         </p>
+        <p className="text-xs mt-2" style={{ color: "var(--ink-muted)" }}>
+          A PDF works fine for a simple register, but a table with many columns reads more
+          reliably as Excel or CSV -- a PDF has to be re-read by AI with no column structure to
+          go on, so some fields can come through blank even when they're in the file.
+        </p>
       </div>
 
       {error && (

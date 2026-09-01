@@ -54,15 +54,40 @@ function birthdayLabel(m: MemberDto): string {
   return m.birthYear ? `${parts}, ${m.birthYear}` : parts;
 }
 
+const GENDER_EXPORT_LABELS: Record<string, string> = { MALE: "Male", FEMALE: "Female" };
+const MARITAL_EXPORT_LABELS: Record<string, string> = {
+  SINGLE: "Single",
+  MARRIED: "Married",
+  DIVORCED: "Divorced",
+  WIDOWED: "Widowed",
+};
+const WORKING_STATUS_EXPORT_LABELS: Record<string, string> = {
+  EMPLOYED: "Employed",
+  SELF_EMPLOYED: "Self employed",
+  UNEMPLOYED: "Unemployed",
+  RETIRED: "Retired",
+};
+
+/** Every field the Members table can show (see ALL_COLUMNS in
+ * MembersPage.tsx) -- exports aren't tied to whichever columns happen to be
+ * toggled on/off on screen, they're the full record every time. */
 function toRows(members: MemberDto[]) {
   return members.map((m) => ({
     "Full name": m.fullName,
+    Number: m.memberNumber ?? "",
     Phone: m.phone ?? "",
     Email: m.email ?? "",
+    Gender: m.gender ? (GENDER_EXPORT_LABELS[m.gender] ?? m.gender) : "",
+    Household: m.household?.name ?? "",
+    Fellowship: m.fellowship?.name ?? "",
+    "Added by": m.createdBy?.fullName ?? "",
+    Address: m.address ?? "",
     Nationality: m.nationality ?? "",
     Birthday: birthdayLabel(m),
-    "Marital status": m.maritalStatus ?? "",
+    "Marital status": m.maritalStatus ? (MARITAL_EXPORT_LABELS[m.maritalStatus] ?? m.maritalStatus) : "",
+    "Working status": m.workingStatus ? (WORKING_STATUS_EXPORT_LABELS[m.workingStatus] ?? m.workingStatus) : "",
     Student: m.isStudent ? m.school || "Yes" : "",
+    Joined: m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : "",
     Status: m.status,
   }));
 }
@@ -84,7 +109,7 @@ export function exportMembersToPdf(members: MemberDto[], orgName: string, logoDa
     startY: 26,
     head: [Object.keys(rows[0] ?? { "Full name": "" })],
     body: rows.map((r) => Object.values(r)),
-    styles: { fontSize: 8 },
+    styles: { fontSize: 6.5, cellPadding: 1.5 },
     headStyles: { fillColor: [27, 122, 87] },
   });
 

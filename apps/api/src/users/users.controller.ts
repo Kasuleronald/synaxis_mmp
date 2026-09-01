@@ -36,6 +36,13 @@ export class UsersController {
     return this.users.update(tenantContextFor(user), id, dto);
   }
 
+  @Post(":id/reset-password")
+  @Roles(Role.ORG_ADMIN)
+  @Audit({ action: "STAFF_PASSWORD_RESET_SENT", entityType: "user" })
+  requestPasswordReset(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.users.requestPasswordReset(tenantContextFor(user), id);
+  }
+
   @Patch("me/avatar")
   setAvatar(@CurrentUser() user: SessionUser, @Body() dto: UpdateAvatarDto) {
     return this.users.setAvatar(tenantContextFor(user), user.id, dto.assetId);

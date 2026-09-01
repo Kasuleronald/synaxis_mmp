@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { randomUUID } from "crypto";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -8,6 +9,53 @@ import { CreateDebriefDto } from "./dto/create-debrief.dto";
 const DEBRIEF_INCLUDE = {
   submittedBy: { select: { id: true, fullName: true } },
 } as const;
+
+// A generous cap, not a real-world expectation -- weekly for two years,
+// daily for ~3.5 months, or monthly for 8+ years all land under it. Exists
+// so a mistyped "until" decades out can't silently generate thousands of
+// rows (and attendance sessions to match) in one request.
+const MAX_OCCURRENCES = 104;
+
+/** One row per occurrence, each keeping the original's time-of-day and
+ * duration -- a plain one-off event is just the degenerate one-occurrence
+ * case, so create() never has to branch on whether recurrence was set. */
+function computeOccurrences(
+  startsAt: Date,
+  endsAt: Date | null,
+  recurrence: CreateEventDto["recurrence"],
+): { startsAt: Date; endsAt: Date | null }[] {
+  if (!recurrence) return [{ startsAt, endsAt }];
+
+  const until = new Date(recurrence.until);
+  if (until < startsAt) {
+    throw new BadRequestException("The recurrence end date can't be before the event's own start.");
+  }
+  const durationMs = endsAt ? endsAt.getTime() - startsAt.getTime() : null;
+
+  const occurrences: { startsAt: Date; endsAt: Date | null }[] = [];
+  const cursor = new Date(startsAt);
+  while (cursor <= until) {
+    if (occurrences.length >= MAX_OCCURRENCES) {
+      throw new BadRequestException(`That repeats into more than ${MAX_OCCURRENCES} events -- pick a nearer end date.`);
+    }
+    occurrences.push({
+      startsAt: new Date(cursor),
+      endsAt: durationMs != null ? new Date(cursor.getTime() + durationMs) : null,
+    });
+    switch (recurrence.frequency) {
+      case "DAILY":
+        cursor.setDate(cursor.getDate() + 1);
+        break;
+      case "WEEKLY":
+        cursor.setDate(cursor.getDate() + 7);
+        break;
+      case "MONTHLY":
+        cursor.setMonth(cursor.getMonth() + 1);
+        break;
+    }
+  }
+  return occurrences;
+}
 
 @Injectable()
 export class EventsService {
@@ -21,32 +69,45 @@ export class EventsService {
    * register their attendance") -- reuses the existing check-in/QR
    * infrastructure entirely rather than a parallel registration system, so
    * the public link is just this session's already-working /checkin/:token
-   * page. */
+   * page. A recurring create produces one such event+session pair per
+   * occurrence, sharing a recurrenceGroupId -- each occurrence is a fully
+   * independent event afterward (own debrief, own attendance). */
   async create(ctx: TenantContext, dto: CreateEventDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
+    const occurrences = computeOccurrences(
+      new Date(dto.startsAt),
+      dto.endsAt ? new Date(dto.endsAt) : null,
+      dto.recurrence,
+    );
     return runWithTenant(this.prisma, ctx, async (tx) => {
-      const event = await tx.event.create({
-        data: {
-          organizationId: ctx.organizationId as string,
-          branchId: dto.branchId,
-          title: dto.title,
-          description: dto.description,
-          location: dto.location,
-          startsAt: new Date(dto.startsAt),
-          endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
-        },
-      });
-      const session = await tx.attendanceSession.create({
-        data: {
-          organizationId: ctx.organizationId as string,
-          branchId: dto.branchId,
-          eventId: event.id,
-          name: event.title,
-          date: event.startsAt,
-        },
-        select: { id: true, qrToken: true },
-      });
-      return { ...event, attendanceSessions: [session] };
+      const recurrenceGroupId = occurrences.length > 1 ? randomUUID() : undefined;
+      const created = [];
+      for (const occ of occurrences) {
+        const event = await tx.event.create({
+          data: {
+            organizationId: ctx.organizationId as string,
+            branchId: dto.branchId,
+            title: dto.title,
+            description: dto.description,
+            location: dto.location,
+            startsAt: occ.startsAt,
+            endsAt: occ.endsAt ?? undefined,
+            recurrenceGroupId,
+          },
+        });
+        const session = await tx.attendanceSession.create({
+          data: {
+            organizationId: ctx.organizationId as string,
+            branchId: dto.branchId,
+            eventId: event.id,
+            name: event.title,
+            date: event.startsAt,
+          },
+          select: { id: true, qrToken: true },
+        });
+        created.push({ ...event, attendanceSessions: [session] });
+      }
+      return created.length === 1 ? created[0] : { events: created };
     });
   }
 

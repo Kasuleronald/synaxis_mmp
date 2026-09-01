@@ -10,6 +10,7 @@ import { NotificationBell } from "./NotificationBell";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
 import { CommandPalette } from "./CommandPalette";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 interface NavItem {
   label: string;
@@ -371,6 +372,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const terms = useTerminology();
   const navGroups = buildNavGroups(terms);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     if (!user) return false;
     return localStorage.getItem(`sidebar-collapsed:${user.id}`) === "true";
@@ -529,6 +531,16 @@ export function Shell({ children }: { children: ReactNode }) {
             <Logo className="h-6 w-auto" />
             <ModeToggle />
             {user?.role !== Role.PLATFORM_ADMIN && <Avatar />}
+            {user?.role === Role.PLATFORM_ADMIN && (
+              <button
+                type="button"
+                onClick={() => setShowChangePassword(true)}
+                className="text-sm underline"
+                style={{ color: "var(--ink-muted)" }}
+              >
+                Change password
+              </button>
+            )}
             <button
               type="button"
               onClick={() => logout()}
@@ -542,6 +554,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <main className="flex-1 p-6 overflow-y-auto">{children}</main>
       </div>
       <CommandPalette />
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { ORG_ASSIGNABLE_ROLES } from "@life-mmp/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
+import { AuthService } from "../auth/auth.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
@@ -25,7 +26,10 @@ const USER_SELECT = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auth: AuthService,
+  ) {}
 
   async create(ctx: TenantContext, dto: CreateUserDto) {
     if (!ctx.organizationId) {
@@ -58,6 +62,10 @@ export class UsersService {
           fullName: dto.fullName,
           passwordHash,
           role: dto.role,
+          // Only the admin who just typed it in sees this temporary
+          // password -- it must be changed the moment the new staff member
+          // actually logs in themselves (Sep 2026).
+          mustChangePassword: true,
         },
         select: USER_SELECT,
       });
@@ -100,5 +108,20 @@ export class UsersService {
     return runWithTenant(this.prisma, ctx, (tx) =>
       tx.user.update({ where: { id }, data: { avatarAssetId: null }, select: USER_SELECT }),
     );
+  }
+
+  /** Org Admin resetting one of their own staff's password (Sep 2026) --
+   * mirrors the Platform-Admin-resets-an-Org-Admin flow. The membership
+   * check runs under the caller's own tenant-scoped RLS, so `id` has to
+   * already belong to this org before the email is ever sent; the actual
+   * send is delegated to AuthService, which is the one place that knows how
+   * to email a reset link without handing the token back to the caller. */
+  async requestPasswordReset(ctx: TenantContext, id: string): Promise<{ email: string }> {
+    if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
+    await runWithTenant(this.prisma, ctx, async (tx) => {
+      const target = await tx.user.findUnique({ where: { id }, select: { id: true } });
+      if (!target) throw new NotFoundException("User not found");
+    });
+    return this.auth.sendResetEmailForUser(id);
   }
 }

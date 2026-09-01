@@ -199,6 +199,7 @@ export interface SessionUser {
   isPastor: boolean;
   isFellowshipsDepartmentHead: boolean;
   isDevotionalEditor: boolean;
+  mustChangePassword: boolean;
 }
 
 // --- Sprint 2: People -------------------------------------------------
@@ -437,11 +438,21 @@ export interface EventDto {
   location: string | null;
   startsAt: string;
   endsAt: string | null;
+  recurrenceGroupId?: string | null;
   debrief?: { id: string } | null;
   // The auto-created attendance session behind this event's public
   // registration link (/checkin/:qrToken) -- always present once created.
   attendanceSessions?: { id: string; qrToken: string }[];
 }
+
+export const RECURRENCE_FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY"] as const;
+export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
+
+export const RECURRENCE_FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+};
 
 export interface CreateEventInput {
   branchId?: string;
@@ -450,6 +461,7 @@ export interface CreateEventInput {
   location?: string;
   startsAt: string;
   endsAt?: string;
+  recurrence?: { frequency: RecurrenceFrequency; until: string };
 }
 
 /** Filed once an event has actually happened -- a concrete report type of
