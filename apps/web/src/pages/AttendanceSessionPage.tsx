@@ -339,12 +339,17 @@ export function AttendanceSessionPage() {
         <h2 className="text-sm font-medium mb-1" style={{ color: "var(--ink-muted)" }}>
           Checked in
         </h2>
-        {records.length > 0 && (
-          <p className="text-xs mb-3" style={{ color: "var(--ink-muted)" }}>
-            {records.filter((r) => attendanceRecordIsStudent(r) === true).length} students ·{" "}
-            {records.filter((r) => attendanceRecordIsStudent(r) === false).length} non-students
-          </p>
-        )}
+        {records.length > 0 && (() => {
+          const studentCount = records.filter((r) => attendanceRecordIsStudent(r) === true).length;
+          const nonStudentCount = records.filter((r) => attendanceRecordIsStudent(r) === false).length;
+          const unspecifiedCount = records.length - studentCount - nonStudentCount;
+          return (
+            <p className="text-xs mb-3" style={{ color: "var(--ink-muted)" }}>
+              {studentCount} students · {nonStudentCount} non-students
+              {unspecifiedCount > 0 ? ` · ${unspecifiedCount} unspecified` : ""}
+            </p>
+          );
+        })()}
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--line)" }}>
           {records.length === 0 && (
             <div className="p-4 text-sm" style={{ color: "var(--ink-muted)" }}>

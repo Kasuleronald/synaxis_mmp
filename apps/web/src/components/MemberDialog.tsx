@@ -325,7 +325,16 @@ export function MemberDialog({ member: initial, members, households, fellowships
                     : null
                 }
               />
-              <Field label="Marital status" value={member.maritalStatus ? MARITAL_LABELS[member.maritalStatus] : null} />
+              <Field
+                label="Marital status"
+                value={
+                  member.maritalStatus
+                    ? currentSpouse
+                      ? `${MARITAL_LABELS[member.maritalStatus]} to ${currentSpouse.fullName}`
+                      : MARITAL_LABELS[member.maritalStatus]
+                    : null
+                }
+              />
               <Field label="Working status" value={member.workingStatus ? WORKING_STATUS_LABELS[member.workingStatus] : null} />
               <Field label="Student" value={member.isStudent ? member.school || "Yes" : null} />
               <Field label="Status" value={STATUS_LABELS[member.status]} />

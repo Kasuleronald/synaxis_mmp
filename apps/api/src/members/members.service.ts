@@ -99,7 +99,17 @@ export class MembersService {
    * so linking a spouse just joins both members into one, creating it if
    * neither has one yet. Whichever household the spouse already belongs to
    * (even a multi-generational one) is what gets joined -- correcting an
-   * unusual case is a normal household edit, not a special path here. */
+   * unusual case is a normal household edit, not a special path here.
+   *
+   * Both sides of the pairing are set explicitly every time (Sep 2026 fix)
+   * -- the household-already-exists path used to only ever touch the
+   * initiating member's own role, leaving the other side's role/maritalStatus
+   * stale (and MemberDialog's own bidirectional "Married to X" lookup
+   * requires an actual HEAD+SPOUSE pair to find one another, so a stale
+   * role silently broke that on whichever side wasn't just edited). Also
+   * sets maritalStatus: MARRIED on both -- selecting a spouse is itself the
+   * declaration, the other person shouldn't have to separately go set their
+   * own status to match. */
   private async linkSpouse(tx: any, organizationId: string, memberId: string, spouseMemberId: string) {
     const spouse = await tx.member.findUnique({ where: { id: spouseMemberId } });
     if (!spouse) throw new NotFoundException("Selected spouse member not found");
@@ -111,10 +121,18 @@ export class MembersService {
         data: { organizationId, name: `${spouse.fullName} & ${member?.fullName ?? "Spouse"}` },
       });
       householdId = household.id;
-      await tx.member.update({ where: { id: spouseMemberId }, data: { householdId, householdRole: "HEAD" } });
     }
 
-    return tx.member.update({ where: { id: memberId }, data: { householdId, householdRole: "SPOUSE" } });
+    const spouseRole = spouse.householdRole === "SPOUSE" ? "SPOUSE" : "HEAD";
+    const memberRole = spouseRole === "SPOUSE" ? "HEAD" : "SPOUSE";
+    await tx.member.update({
+      where: { id: spouseMemberId },
+      data: { householdId, householdRole: spouseRole, maritalStatus: "MARRIED" },
+    });
+    return tx.member.update({
+      where: { id: memberId },
+      data: { householdId, householdRole: memberRole, maritalStatus: "MARRIED" },
+    });
   }
 
   async list(ctx: TenantContext, search?: string, branchId?: string | null) {

@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-01 (8) (Student attendance tracking -- see the newest section right below)
+**Last updated:** 2026-09-02 (Fixed spouse-linking not being reciprocal -- see the newest section right below)
 
+## 2026-09-02 — Fixed spouse linking
+
+- **Fixed:** linking Member A to Member B as a spouse only ever reliably updated A's own household role, not B's -- if B already belonged to a household (even one they were already the head of), B's role/marital status could be left stale, so opening B's own profile kept offering to link a spouse instead of showing "Married to A". Both sides of a spouse link are now always set explicitly (one Head, one Spouse, both marital status Married), whichever direction the link was made from.
+- **Fixed:** an attendance session's "X students · Y non-students" count could add up to less than the number actually checked in -- a member with no student/non-student answer on their own profile fell into neither bucket. Now shows a third "Z unspecified" count when that happens, so the numbers always add up.
 ## 2026-09-01 (8) — Track students vs non-students at check-in
 
 - **Walk-in check-in (staff-operated and public/QR) now has a "Student" checkbox** alongside name and phone. A known Member's student status still comes from their own profile (the `isStudent` field already on Add Member) -- the checkbox only exists for walk-ins, who have no profile to look it up from.
