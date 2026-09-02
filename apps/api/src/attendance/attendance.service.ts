@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { runWithTenant, TenantContext } from "../prisma/tenant";
 import { pickDefaultFollowUpAssignee } from "../follow-ups/default-assignee";
@@ -88,10 +88,27 @@ async function findDuplicate(tx: any, sessionId: string, memberId?: string, visi
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Same name, same branch, the exact same date/time -- almost certainly a
+   * double-submit (a double-click on "Start session" before the button
+   * disabled, or a retried request), not two genuinely different sessions
+   * (Sep 2026: "that should not even happen"). Two different times the same
+   * day, or two different names, are unaffected -- only a byte-for-byte
+   * repeat is rejected. */
+  private async assertNotDuplicateSession(tx: any, organizationId: string, dto: CreateAttendanceSessionDto) {
+    const existing = await tx.attendanceSession.findFirst({
+      where: { organizationId, branchId: dto.branchId ?? null, name: dto.name, date: new Date(dto.date) },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException(`A session named "${dto.name}" at this exact date and time already exists.`);
+    }
+  }
+
   async createSession(ctx: TenantContext, dto: CreateAttendanceSessionDto) {
     if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
-    return runWithTenant(this.prisma, ctx, (tx) =>
-      tx.attendanceSession.create({
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      await this.assertNotDuplicateSession(tx, ctx.organizationId as string, dto);
+      return tx.attendanceSession.create({
         data: {
           organizationId: ctx.organizationId as string,
           branchId: dto.branchId,
@@ -101,8 +118,8 @@ export class AttendanceService {
           name: dto.name,
           date: new Date(dto.date),
         },
-      }),
-    );
+      });
+    });
   }
 
   async listSessions(ctx: TenantContext, branchId?: string | null) {
@@ -113,6 +130,21 @@ export class AttendanceService {
         include: { _count: { select: { records: true } } },
       }),
     );
+  }
+
+  /** Deletes the session and (cascading) every check-in record it has --
+   * for cleaning up a mistaken/duplicate session, e.g. one created twice by
+   * accident (Sep 2026). No approval flow like Member/Branch deletion goes
+   * through -- this is an operational correction, not a request to remove
+   * someone's own record, so it's immediate like deleting a single
+   * check-in already was. */
+  async deleteSession(ctx: TenantContext, id: string) {
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const session = await tx.attendanceSession.findUnique({ where: { id } });
+      if (!session) throw new NotFoundException("Attendance session not found");
+      await tx.attendanceSession.delete({ where: { id } });
+      return { ok: true };
+    });
   }
 
   async getSession(ctx: TenantContext, id: string) {

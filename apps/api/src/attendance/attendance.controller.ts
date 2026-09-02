@@ -62,4 +62,14 @@ export class AttendanceController {
   linkMember(@CurrentUser() user: SessionUser, @Param("recordId") recordId: string, @Body() dto: LinkMemberDto) {
     return this.attendance.linkMember(tenantContextFor(user), recordId, dto);
   }
+
+  // Same reasoning/role restriction as deleteRecord -- for cleaning up a
+  // mistaken or duplicate session (Sep 2026), not a routine action.
+  @Delete(":id")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ORG_ADMIN, Role.DEPARTMENT_HEAD, Role.FELLOWSHIP_LEADER)
+  @Audit({ action: "ATTENDANCE_SESSION_DELETED", entityType: "attendanceSession" })
+  deleteSession(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.attendance.deleteSession(tenantContextFor(user), id);
+  }
 }

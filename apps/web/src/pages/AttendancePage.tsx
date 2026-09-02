@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AttendanceSessionDto, MeetingCategoryDto } from "@life-mmp/shared";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
+import { IconButton, TrashIcon } from "../components/icons";
 
 type SessionWithCount = AttendanceSessionDto & { _count: { records: number } };
 
@@ -13,6 +14,9 @@ export function AttendancePage() {
   const [categoryId, setCategoryId] = useState("");
   const [customName, setCustomName] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load() {
     const [sessionList, categoryList] = await Promise.all([
@@ -31,15 +35,44 @@ export function AttendancePage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const category = categories.find((c) => c.id === categoryId);
-    const name = category ? category.name : customName;
-    await api.post("/attendance/sessions", {
-      name,
-      date: new Date(date).toISOString(),
-      categoryId: category ? category.id : undefined,
-    });
-    setCustomName("");
-    load();
+    // Guards the double-click case directly -- the backend also rejects an
+    // exact name+date repeat, but disabling here stops the second request
+    // from ever firing in the first place (Sep 2026).
+    if (submitting) return;
+    setSubmitting(true);
+    setCreateError(null);
+    try {
+      const category = categories.find((c) => c.id === categoryId);
+      const name = category ? category.name : customName;
+      await api.post("/attendance/sessions", {
+        name,
+        date: new Date(date).toISOString(),
+        categoryId: category ? category.id : undefined,
+      });
+      setCustomName("");
+      await load();
+    } catch (err) {
+      setCreateError(err instanceof ApiError ? err.message : "Couldn't start this session.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onDeleteSession(s: SessionWithCount) {
+    const warning =
+      s._count.records > 0
+        ? `Delete "${s.name}" and its ${s._count.records} check-in${s._count.records === 1 ? "" : "s"}? This can't be undone.`
+        : `Delete "${s.name}"? This can't be undone.`;
+    if (!window.confirm(warning)) return;
+    setDeletingId(s.id);
+    try {
+      await api.delete(`/attendance/sessions/${s.id}`);
+      setSessions((prev) => prev.filter((x) => x.id !== s.id));
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : "Couldn't delete this session.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -97,12 +130,18 @@ export function AttendancePage() {
         </div>
         <button
           type="submit"
-          className="rounded-md px-4 py-2 text-sm font-medium"
+          disabled={submitting}
+          className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60"
           style={{ background: "var(--accent)", color: "white" }}
         >
-          Start session
+          {submitting ? "Starting…" : "Start session"}
         </button>
       </form>
+      {createError && (
+        <div className="rounded-md px-3 py-2 text-sm mb-4" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+          {createError}
+        </div>
+      )}
       {categories.length === 0 && (
         <p className="text-xs mb-4" style={{ color: "var(--ink-muted)" }}>
           No meeting types set up yet -- add some under Setup → Organization Admin → Meeting
@@ -117,22 +156,29 @@ export function AttendancePage() {
           </div>
         )}
         {sessions.map((s) => (
-          <Link
+          <div
             key={s.id}
-            to={`/attendance/${s.id}`}
             className="flex items-center justify-between px-4 py-3 border-t first:border-t-0"
             style={{ borderColor: "var(--line-soft)" }}
           >
-            <div>
+            <Link to={`/attendance/${s.id}`} className="flex-1 min-w-0">
               <div className="text-sm font-medium">{s.name}</div>
               <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
                 {new Date(s.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
               </div>
+            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
+                {s._count.records} checked in
+              </span>
+              <IconButton
+                title={deletingId === s.id ? "Deleting…" : "Delete this session"}
+                onClick={() => onDeleteSession(s)}
+              >
+                <TrashIcon />
+              </IconButton>
             </div>
-            <span className="text-xs font-medium" style={{ color: "var(--accent-ink)" }}>
-              {s._count.records} checked in
-            </span>
-          </Link>
+          </div>
         ))}
       </div>
     </div>

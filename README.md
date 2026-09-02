@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-02 (2) (Individual attendance now shows Absent, and a downloadable member profile -- see the newest section right below)
+**Last updated:** 2026-09-02 (3) (Attendance sessions can be deleted, and a double-started session is now rejected -- see the newest section right below)
 
+## 2026-09-02 (3) — Delete a mistaken attendance session; block accidental duplicates
+
+- **A session can now be deleted** (trash icon on its row, Attendance page) -- for cleaning up one started by mistake. Deletes its check-in records too if it has any (asks for confirmation first, and says how many). Immediate, not routed through the deletion-request approval flow -- same level of friction as removing a single check-in already was.
+- **Starting the exact same session twice is now rejected** -- same name, same branch, the exact same date/time is treated as a double-submit and refused with a clear error, rather than silently creating a second copy. Two different times the same day, or two different names, are unaffected. The "Start session" button also now disables itself the instant it's clicked, so a fast double-click never fires two requests in the first place.
 ## 2026-09-02 (2) — Individual attendance history, and a downloadable member profile
 
 - **Reports → Attendance lists → Individual attendance now shows the last 20 sessions the member could have attended, in order, marked Present or Absent** -- not just a list of the ones they actually checked into. Sessions scope to the member's own branch plus any org-wide ones.
