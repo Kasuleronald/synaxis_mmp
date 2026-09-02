@@ -15,7 +15,12 @@ function detectImageFormat(dataUri: string): "PNG" | "JPEG" | "WEBP" {
  * doc and again (via `addBrandedFooter`) right before saving -- the church
  * logo top-left with the ministry name, and the platform footer on every
  * page, so exports read as coming from this system wherever they end up. */
-export function addBrandedHeader(doc: jsPDF, orgName: string, title: string, logoDataUri?: string | null) {
+/** `dateLabel` defaults to today (the export itself) -- pass the actual
+ * event/session date instead for a report about one specific occurrence
+ * (Sep 2026: "events reports must have event dates instead of date of
+ * export"), so the header reads as "when this happened," not "when this
+ * was downloaded." */
+export function addBrandedHeader(doc: jsPDF, orgName: string, title: string, logoDataUri?: string | null, dateLabel?: string) {
   let textX = 14;
   if (logoDataUri) {
     try {
@@ -30,7 +35,7 @@ export function addBrandedHeader(doc: jsPDF, orgName: string, title: string, log
   doc.text(`${orgName} -- ${title}`, textX, 15);
   doc.setFontSize(9);
   doc.setTextColor(120);
-  doc.text(new Date().toLocaleDateString(), textX, 21);
+  doc.text(dateLabel ?? new Date().toLocaleDateString(), textX, 21);
   doc.setTextColor(0);
 }
 
@@ -118,9 +123,10 @@ export function exportMembersToPdf(members: MemberDto[], orgName: string, logoDa
 }
 
 function attendanceRows(records: AttendanceRecordDto[]) {
-  return records.map((r) => {
+  return records.map((r, i) => {
     const isStudent = attendanceRecordIsStudent(r);
     return {
+      "#": i + 1,
       Name: r.member?.fullName ?? r.visitorName ?? "",
       Phone: r.member?.phone ?? r.visitorPhone ?? "",
       Type: r.memberId ? "Member" : "Walk-in",
@@ -143,17 +149,19 @@ export function exportAttendanceToPdf(
   orgName: string,
   sessionName: string,
   logoDataUri?: string | null,
+  sessionDate?: string,
 ) {
   const doc = new jsPDF();
-  addBrandedHeader(doc, orgName, sessionName, logoDataUri);
+  addBrandedHeader(doc, orgName, sessionName, logoDataUri, sessionDate ? new Date(sessionDate).toLocaleDateString() : undefined);
 
   const rows = attendanceRows(records);
   autoTable(doc, {
     startY: 26,
-    head: [Object.keys(rows[0] ?? { Name: "" })],
+    head: [Object.keys(rows[0] ?? { "#": "", Name: "" })],
     body: rows.map((r) => Object.values(r)),
     styles: { fontSize: 9 },
     headStyles: { fillColor: [27, 122, 87] },
+    columnStyles: { 0: { cellWidth: 10 } },
   });
 
   addBrandedFooter(doc);
@@ -184,14 +192,15 @@ export function exportMemberProfileToPdf(profile: MemberProfileReportDto, orgNam
   doc.text("Attendance", 14, 34);
   autoTable(doc, {
     startY: 37,
-    head: [["Session", "Date", "Status"]],
+    head: [["#", "Session", "Date", "Status"]],
     body: profile.attendance.lines.length
-      ? profile.attendance.lines.map((l) => [l.sessionName, new Date(l.sessionDate).toLocaleDateString(), l.present ? "Present" : "Absent"])
-      : [["No sessions in this period", "", ""]],
-    foot: [[`Present: ${profile.attendance.presentCount}`, `Absent: ${profile.attendance.absentCount}`, ""]],
+      ? profile.attendance.lines.map((l, i) => [i + 1, l.sessionName, new Date(l.sessionDate).toLocaleDateString(), l.present ? "Present" : "Absent"])
+      : [["", "No sessions in this period", "", ""]],
+    foot: [["", `Present: ${profile.attendance.presentCount}`, `Absent: ${profile.attendance.absentCount}`, ""]],
     styles: { fontSize: 8 },
     headStyles: { fillColor: [27, 122, 87] },
     footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 10 } },
   });
 
   // jspdf-autotable attaches this at runtime; not part of jsPDF's own types.
@@ -223,7 +232,8 @@ export function exportMemberProfileToExcel(profile: MemberProfileReportDto) {
   const name = profile.member?.fullName ?? "Member";
   const wb = XLSX.utils.book_new();
 
-  const attendanceRows = profile.attendance.lines.map((l) => ({
+  const attendanceRows = profile.attendance.lines.map((l, i) => ({
+    "#": i + 1,
     Session: l.sessionName,
     Date: new Date(l.sessionDate).toLocaleDateString(),
     Status: l.present ? "Present" : "Absent",

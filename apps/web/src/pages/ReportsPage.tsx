@@ -343,7 +343,7 @@ function AttendanceListsTab() {
     try {
       const records = await api.get<AttendanceRecordDto[]>(`/attendance/sessions/${sessionId}/records`);
       if (format === "excel") exportAttendanceToExcel(records, org?.displayName ?? "Synaxis MMP", session.name);
-      else exportAttendanceToPdf(records, org?.displayName ?? "Synaxis MMP", session.name, org?.logoUrl);
+      else exportAttendanceToPdf(records, org?.displayName ?? "Synaxis MMP", session.name, org?.logoUrl, session.date);
       logExport(`Attendance -- ${session.name} (${format === "excel" ? "Excel" : "PDF"})`);
     } finally {
       setDownloading(false);
@@ -389,7 +389,8 @@ function AttendanceListsTab() {
       </Card>
       <Card
         title="Individual attendance"
-        exportRows={memberAttendance?.lines.map((l) => ({
+        exportRows={memberAttendance?.lines.map((l, i) => ({
+          "#": i + 1,
           Session: l.sessionName,
           Date: l.sessionDate,
           Status: l.present ? "Present" : "Absent",

@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-02 (3) (Attendance sessions can be deleted, and a double-started session is now rejected -- see the newest section right below)
+**Last updated:** 2026-09-02 (4) (Attendance/session exports numbered, and PDF headers show the event's own date -- see the newest section right below)
 
+## 2026-09-02 (4) — Row numbers on attendance exports; event date instead of export date
+
+- **Attendance/session exports (Excel and PDF) now have a "#" first column** (1, 2, 3, ...) -- an event's attendance list, a member's individual attendance history, and the attendance section of a downloaded member profile.
+- **Fixed: a session/event's PDF export showed the date it was downloaded, not the date the event actually happened.** An event's attendance-list PDF now shows the session's own date under the title, the same way its filename and content already referred to that specific session.
 ## 2026-09-02 (3) — Delete a mistaken attendance session; block accidental duplicates
 
 - **A session can now be deleted** (trash icon on its row, Attendance page) -- for cleaning up one started by mistake. Deletes its check-in records too if it has any (asks for confirmation first, and says how many). Immediate, not routed through the deletion-request approval flow -- same level of friction as removing a single check-in already was.
