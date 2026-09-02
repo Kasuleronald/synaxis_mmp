@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-02 (4) (Attendance/session exports numbered, and PDF headers show the event's own date -- see the newest section right below)
+**Last updated:** 2026-09-02 (5) (Fixed the member profile download occasionally failing -- see the newest section right below)
 
+## 2026-09-02 (5) — Fixed "download of member profile at times fails"
+
+- **Root cause:** clearing the From/To date fields sent them to the server as literally empty (`from=`) rather than omitted -- an ambiguous value the report couldn't reliably use as either "a real date" or "no filter," and a failure that gave no visible error either way, so it just looked like nothing happened.
+- **Fixed both sides:** the download now omits From/To from the request entirely when either is left blank (unambiguous "no filter"), the server now validates a from/to that IS sent as a real date and returns a clear error if it isn't (instead of an unpredictable failure), and any download error now shows an actual message under the buttons instead of failing silently.
 ## 2026-09-02 (4) — Row numbers on attendance exports; event date instead of export date
 
 - **Attendance/session exports (Excel and PDF) now have a "#" first column** (1, 2, 3, ...) -- an event's attendance list, a member's individual attendance history, and the attendance section of a downloaded member profile.

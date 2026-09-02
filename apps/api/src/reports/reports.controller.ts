@@ -5,6 +5,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { branchScopeFor, tenantContextFor } from "../auth/tenant-context";
+import { MemberProfileQueryDto } from "./dto/member-profile-query.dto";
 import { ReportsService } from "./reports.service";
 
 // Reports used to be Org Admin/Finance Officer only. Now that every list
@@ -58,13 +59,8 @@ export class ReportsController {
   }
 
   @Get("member-profile/:memberId")
-  memberProfile(
-    @CurrentUser() user: SessionUser,
-    @Param("memberId") memberId: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-  ) {
-    return this.reports.memberProfile(tenantContextFor(user), memberId, from, to);
+  memberProfile(@CurrentUser() user: SessionUser, @Param("memberId") memberId: string, @Query() query: MemberProfileQueryDto) {
+    return this.reports.memberProfile(tenantContextFor(user), memberId, query.from, query.to);
   }
 
   @Get("fund-statement/:fundId")

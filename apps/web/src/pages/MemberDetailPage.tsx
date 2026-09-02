@@ -10,7 +10,7 @@ import {
   type MemberDto,
   type MemberProfileReportDto,
 } from "@life-mmp/shared";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
 import { useAuth } from "../context/AuthContext";
@@ -63,6 +63,7 @@ export function MemberDetailPage() {
   const [profileFrom, setProfileFrom] = useState(() => monthsAgo(3));
   const [profileTo, setProfileTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [downloadingProfile, setDownloadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [nationality, setNationality] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
@@ -184,12 +185,22 @@ export function MemberDetailPage() {
   async function downloadProfile(format: "excel" | "pdf") {
     if (!member) return;
     setDownloadingProfile(true);
+    setProfileError(null);
     try {
-      const qs = `?from=${profileFrom}&to=${profileTo}`;
+      // Only send from/to when actually set -- an empty string sent as
+      // `from=` reached the server as neither "no filter" nor a real date,
+      // an ambiguity that's part of what made this occasionally fail
+      // (Sep 2026). Omitting the key entirely is unambiguous either way.
+      const params = new URLSearchParams();
+      if (profileFrom) params.set("from", profileFrom);
+      if (profileTo) params.set("to", profileTo);
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const profile = await api.get<MemberProfileReportDto>(`/reports/member-profile/${member.id}${qs}`);
       if (format === "excel") exportMemberProfileToExcel(profile);
       else exportMemberProfileToPdf(profile, org?.displayName ?? "Synaxis MMP", org?.logoUrl);
       logExport(`${member.fullName} profile (${format === "excel" ? "Excel" : "PDF"})`);
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : "Couldn't download this profile. Try again.");
     } finally {
       setDownloadingProfile(false);
     }
@@ -271,7 +282,7 @@ export function MemberDetailPage() {
               className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
               style={{ background: "var(--surface-2)", color: "var(--ink)" }}
             >
-              Excel (.xlsx)
+              {downloadingProfile ? "Preparing…" : "Excel (.xlsx)"}
             </button>
             <button
               type="button"
@@ -280,9 +291,14 @@ export function MemberDetailPage() {
               className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
               style={{ background: "var(--surface-2)", color: "var(--ink)" }}
             >
-              PDF
+              {downloadingProfile ? "Preparing…" : "PDF"}
             </button>
           </div>
+          {profileError && (
+            <div className="mt-2 rounded-md px-3 py-2 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+              {profileError}
+            </div>
+          )}
         </section>
       )}
 
