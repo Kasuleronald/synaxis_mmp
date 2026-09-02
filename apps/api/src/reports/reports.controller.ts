@@ -57,6 +57,16 @@ export class ReportsController {
     return this.reports.memberAttendance(tenantContextFor(user), memberId);
   }
 
+  @Get("member-profile/:memberId")
+  memberProfile(
+    @CurrentUser() user: SessionUser,
+    @Param("memberId") memberId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.reports.memberProfile(tenantContextFor(user), memberId, from, to);
+  }
+
   @Get("fund-statement/:fundId")
   fundStatement(@CurrentUser() user: SessionUser, @Param("fundId") fundId: string) {
     return this.reports.fundStatement(tenantContextFor(user), fundId);

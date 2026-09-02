@@ -1197,15 +1197,47 @@ export interface MemberAttendanceLineDto {
   sessionId: string;
   sessionName: string;
   sessionDate: string;
-  checkedInAt: string;
+  // False (and checkedInAt null) means this member was expected at this
+  // session (same branch, or an org-wide one) but has no check-in record --
+  // an actual "Absent" row, not just an omitted one (Sep 2026).
+  present: boolean;
+  checkedInAt: string | null;
 }
 
 export interface MemberAttendanceDto {
   member: { id: string; fullName: string } | null;
+  // The most recent RECENT_SESSION_LIMIT sessions this member could have
+  // attended, most-recent first, present or absent -- not just the ones
+  // they actually checked into.
   lines: MemberAttendanceLineDto[];
   totalCheckIns: number;
   firstCheckIn: string | null;
   lastCheckIn: string | null;
+}
+
+/// A member's combined attendance + giving history for a chosen period --
+/// "download a member profile" (Sep 2026), one document instead of pulling
+/// the individual-attendance and giving-statement reports separately.
+export interface MemberProfileReportDto {
+  member: {
+    id: string;
+    fullName: string;
+    memberNumber: string | null;
+    phone: string | null;
+    email: string | null;
+    status: string;
+  } | null;
+  from: string | null;
+  to: string | null;
+  attendance: {
+    lines: MemberAttendanceLineDto[];
+    presentCount: number;
+    absentCount: number;
+  };
+  giving: {
+    lines: StatementLineDto[];
+    total: number;
+  };
 }
 
 export interface FellowshipLeaderboardEntryDto {

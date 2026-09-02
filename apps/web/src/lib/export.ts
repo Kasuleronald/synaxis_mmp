@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { attendanceRecordIsStudent, type AttendanceRecordDto, type MemberDto } from "@life-mmp/shared";
+import { attendanceRecordIsStudent, type AttendanceRecordDto, type MemberDto, type MemberProfileReportDto } from "@life-mmp/shared";
 
 const FOOTER_TEXT = "Extracted from Synaxis - Ministry Management Platform";
 
@@ -158,6 +158,89 @@ export function exportAttendanceToPdf(
 
   addBrandedFooter(doc);
   doc.save(`${sessionName.replace(/[^a-z0-9]+/gi, "-")}-attendance.pdf`);
+}
+
+function memberProfilePeriodLabel(profile: MemberProfileReportDto): string {
+  if (!profile.from && !profile.to) return "All time";
+  const from = profile.from ? new Date(profile.from).toLocaleDateString() : "the beginning";
+  const to = profile.to ? new Date(profile.to).toLocaleDateString() : "now";
+  return `${from} to ${to}`;
+}
+
+/** "Download a member profile" (Sep 2026) -- attendance (present/absent)
+ * and giving for a chosen period, in one document instead of two separate
+ * report downloads. */
+export function exportMemberProfileToPdf(profile: MemberProfileReportDto, orgName: string, logoDataUri?: string | null) {
+  const doc = new jsPDF();
+  const name = profile.member?.fullName ?? "Member";
+  addBrandedHeader(doc, orgName, `${name} -- Profile`, logoDataUri);
+
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text(`Period: ${memberProfilePeriodLabel(profile)}`, 14, 26);
+  doc.setTextColor(0);
+
+  doc.setFontSize(11);
+  doc.text("Attendance", 14, 34);
+  autoTable(doc, {
+    startY: 37,
+    head: [["Session", "Date", "Status"]],
+    body: profile.attendance.lines.length
+      ? profile.attendance.lines.map((l) => [l.sessionName, new Date(l.sessionDate).toLocaleDateString(), l.present ? "Present" : "Absent"])
+      : [["No sessions in this period", "", ""]],
+    foot: [[`Present: ${profile.attendance.presentCount}`, `Absent: ${profile.attendance.absentCount}`, ""]],
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [27, 122, 87] },
+    footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold" },
+  });
+
+  // jspdf-autotable attaches this at runtime; not part of jsPDF's own types.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const afterAttendanceY = (doc as any).lastAutoTable.finalY as number;
+  doc.setFontSize(11);
+  doc.text("Giving", 14, afterAttendanceY + 10);
+  autoTable(doc, {
+    startY: afterAttendanceY + 13,
+    head: [["Date", "Category", "Fund", "Amount", "Running total"]],
+    body: profile.giving.lines.length
+      ? profile.giving.lines.map((l) => [
+          new Date(l.givenAt).toLocaleDateString(),
+          l.category?.name ?? "",
+          l.fund?.name ?? "Undesignated",
+          `${l.currency} ${Number(l.amount).toLocaleString()}`,
+          `${l.currency} ${Number(l.runningTotal).toLocaleString()}`,
+        ])
+      : [["No giving recorded in this period", "", "", "", ""]],
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [27, 122, 87] },
+  });
+
+  addBrandedFooter(doc);
+  doc.save(`${name.replace(/[^a-z0-9]+/gi, "-")}-profile.pdf`);
+}
+
+export function exportMemberProfileToExcel(profile: MemberProfileReportDto) {
+  const name = profile.member?.fullName ?? "Member";
+  const wb = XLSX.utils.book_new();
+
+  const attendanceRows = profile.attendance.lines.map((l) => ({
+    Session: l.sessionName,
+    Date: new Date(l.sessionDate).toLocaleDateString(),
+    Status: l.present ? "Present" : "Absent",
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendanceRows.length ? attendanceRows : [{}]), "Attendance");
+
+  const givingRows = profile.giving.lines.map((l) => ({
+    Date: new Date(l.givenAt).toLocaleDateString(),
+    Category: l.category?.name ?? "",
+    Fund: l.fund?.name ?? "Undesignated",
+    Amount: Number(l.amount),
+    Currency: l.currency,
+    "Running total": l.runningTotal,
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(givingRows.length ? givingRows : [{}]), "Giving");
+
+  XLSX.writeFile(wb, `${name.replace(/[^a-z0-9]+/gi, "-")}-profile.xlsx`);
 }
 
 /** Generic export for any Analytics report card -- takes whatever row

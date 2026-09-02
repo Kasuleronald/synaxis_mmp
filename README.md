@@ -2,8 +2,12 @@
 
 This file tracks what's been built so far, written for you to skim when you're back. It's updated as work continues — check the "Last updated" line at the top.
 
-**Last updated:** 2026-09-02 (Fixed spouse-linking not being reciprocal -- see the newest section right below)
+**Last updated:** 2026-09-02 (2) (Individual attendance now shows Absent, and a downloadable member profile -- see the newest section right below)
 
+## 2026-09-02 (2) — Individual attendance history, and a downloadable member profile
+
+- **Reports → Attendance lists → Individual attendance now shows the last 20 sessions the member could have attended, in order, marked Present or Absent** -- not just a list of the ones they actually checked into. Sessions scope to the member's own branch plus any org-wide ones.
+- **New: download a member's profile** (their own page, "Download profile") -- attendance (present/absent) and giving combined into one document for a date range you choose, as Excel (separate Attendance/Giving sheets) or a branded PDF. Visible to the same roles who already see Reports (Org Admin, Finance Officer, Department Head, Fellowship Leader).
 ## 2026-09-02 — Fixed spouse linking
 
 - **Fixed:** linking Member A to Member B as a spouse only ever reliably updated A's own household role, not B's -- if B already belonged to a household (even one they were already the head of), B's role/marital status could be left stale, so opening B's own profile kept offering to link a spouse instead of showing "Married to A". Both sides of a spouse link are now always set explicitly (one Head, one Spouse, both marital status Married), whichever direction the link was made from.

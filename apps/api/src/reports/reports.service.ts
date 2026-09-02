@@ -182,31 +182,109 @@ export class ReportsService {
     });
   }
 
-  /** One member's own check-in history across every session -- the
-   * "individual attendance analytics" view, same running-history idea as
-   * memberStatement/fundStatement but for attendance instead of giving. */
+  /** The last RECENT_SESSION_LIMIT sessions this member could plausibly
+   * have attended (their own branch's, plus any org-wide one), most recent
+   * first, each marked present or absent -- not just the sessions they
+   * actually checked into (Sep 2026: "have the ones they didn't attend to
+   * have Absent"). totalCheckIns/first/lastCheckIn stay all-time stats,
+   * independent of the 20-session window. */
   async memberAttendance(ctx: TenantContext, memberId: string) {
+    const RECENT_SESSION_LIMIT = 20;
     return runWithTenant(this.prisma, ctx, async (tx) => {
-      const [member, records] = await Promise.all([
-        tx.member.findUnique({ where: { id: memberId }, select: { id: true, fullName: true } }),
-        tx.attendanceRecord.findMany({
-          where: { memberId },
-          include: { session: { select: { id: true, name: true, date: true } } },
-          orderBy: { checkedInAt: "desc" },
+      const member = await tx.member.findUnique({ where: { id: memberId }, select: { id: true, fullName: true, branchId: true } });
+
+      const [allRecords, recentSessions] = await Promise.all([
+        tx.attendanceRecord.findMany({ where: { memberId }, select: { sessionId: true, checkedInAt: true } }),
+        tx.attendanceSession.findMany({
+          where: member?.branchId ? { OR: [{ branchId: member.branchId }, { branchId: null }] } : undefined,
+          orderBy: { date: "desc" },
+          take: RECENT_SESSION_LIMIT,
+          select: { id: true, name: true, date: true },
         }),
       ]);
-      const lines = records.map((r) => ({
-        sessionId: r.sessionId,
-        sessionName: r.session.name,
-        sessionDate: r.session.date,
-        checkedInAt: r.checkedInAt,
+
+      const checkInBySession = new Map(allRecords.map((r) => [r.sessionId, r.checkedInAt]));
+      const lines = recentSessions.map((s) => ({
+        sessionId: s.id,
+        sessionName: s.name,
+        sessionDate: s.date,
+        present: checkInBySession.has(s.id),
+        checkedInAt: checkInBySession.get(s.id) ?? null,
       }));
+
+      const allCheckIns = allRecords.map((r) => r.checkedInAt).sort((a, b) => a.getTime() - b.getTime());
       return {
         member,
         lines,
-        totalCheckIns: lines.length,
-        firstCheckIn: lines.length ? lines[lines.length - 1].checkedInAt : null,
-        lastCheckIn: lines.length ? lines[0].checkedInAt : null,
+        totalCheckIns: allCheckIns.length,
+        firstCheckIn: allCheckIns[0] ?? null,
+        lastCheckIn: allCheckIns[allCheckIns.length - 1] ?? null,
+      };
+    });
+  }
+
+  /** "Download a member profile" (Sep 2026) -- attendance (present/absent,
+   * same idea as memberAttendance but every session in the chosen period
+   * rather than capped at 20) and giving, combined into one document for a
+   * date range instead of pulling two separate reports. `from`/`to` are
+   * inclusive; omitting either leaves that side of the range open. */
+  async memberProfile(ctx: TenantContext, memberId: string, from?: string, to?: string) {
+    if (!ctx.organizationId) throw new ForbiddenException("Only an organization member can do that");
+    return runWithTenant(this.prisma, ctx, async (tx) => {
+      const member = await tx.member.findUnique({
+        where: { id: memberId },
+        select: { id: true, fullName: true, memberNumber: true, phone: true, email: true, status: true, branchId: true },
+      });
+      if (!member) throw new NotFoundException("Member not found");
+
+      const dateRange = {
+        ...(from ? { gte: new Date(from) } : {}),
+        ...(to ? { lte: new Date(to) } : {}),
+      };
+      const hasRange = Object.keys(dateRange).length > 0;
+
+      const [checkIns, sessions, givingRecords] = await Promise.all([
+        tx.attendanceRecord.findMany({ where: { memberId }, select: { sessionId: true, checkedInAt: true } }),
+        tx.attendanceSession.findMany({
+          where: {
+            ...(member.branchId ? { OR: [{ branchId: member.branchId }, { branchId: null }] } : {}),
+            ...(hasRange ? { date: dateRange } : {}),
+          },
+          orderBy: { date: "desc" },
+          select: { id: true, name: true, date: true },
+        }),
+        tx.givingRecord.findMany({
+          where: { memberId, ...(hasRange ? { givenAt: dateRange } : {}) },
+          orderBy: { givenAt: "asc" },
+          include: { category: { select: { id: true, name: true } }, fund: { select: { id: true, name: true } } },
+        }),
+      ]);
+
+      const checkInBySession = new Map(checkIns.map((r) => [r.sessionId, r.checkedInAt]));
+      const attendanceLines = sessions.map((s) => ({
+        sessionId: s.id,
+        sessionName: s.name,
+        sessionDate: s.date,
+        present: checkInBySession.has(s.id),
+        checkedInAt: checkInBySession.get(s.id) ?? null,
+      }));
+
+      let runningTotal = 0;
+      const givingLines = givingRecords.map((r) => {
+        runningTotal += Number(r.amount);
+        return { ...r, runningTotal };
+      });
+
+      return {
+        member,
+        from: from ?? null,
+        to: to ?? null,
+        attendance: {
+          lines: attendanceLines,
+          presentCount: attendanceLines.filter((l) => l.present).length,
+          absentCount: attendanceLines.filter((l) => !l.present).length,
+        },
+        giving: { lines: givingLines, total: runningTotal },
       };
     });
   }

@@ -5,12 +5,26 @@ import {
   FollowUpStatus,
   MaritalStatus,
   MemberStatus,
+  Role,
   type FollowUpDto,
   type MemberDto,
+  type MemberProfileReportDto,
 } from "@life-mmp/shared";
 import { api } from "../lib/api";
 import { db } from "../lib/db";
 import { enqueue } from "../lib/sync";
+import { useAuth } from "../context/AuthContext";
+import { useOrg } from "../context/OrgContext";
+import { exportMemberProfileToExcel, exportMemberProfileToPdf } from "../lib/export";
+import { logExport } from "../lib/auditExport";
+
+const PROFILE_REPORT_ROLES: Role[] = [Role.ORG_ADMIN, Role.FINANCE_OFFICER, Role.DEPARTMENT_HEAD, Role.FELLOWSHIP_LEADER];
+
+function monthsAgo(n: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 const STATUS_LABELS: Record<MemberStatus, string> = {
   VISITOR: "Visitor",
@@ -39,10 +53,16 @@ const MONTHS = [
 
 export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const { org } = useOrg();
   const [member, setMember] = useState<MemberDto | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpDto[]>([]);
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+
+  const [profileFrom, setProfileFrom] = useState(() => monthsAgo(3));
+  const [profileTo, setProfileTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [downloadingProfile, setDownloadingProfile] = useState(false);
 
   const [nationality, setNationality] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
@@ -161,6 +181,20 @@ export function MemberDetailPage() {
     setNotes("");
   }
 
+  async function downloadProfile(format: "excel" | "pdf") {
+    if (!member) return;
+    setDownloadingProfile(true);
+    try {
+      const qs = `?from=${profileFrom}&to=${profileTo}`;
+      const profile = await api.get<MemberProfileReportDto>(`/reports/member-profile/${member.id}${qs}`);
+      if (format === "excel") exportMemberProfileToExcel(profile);
+      else exportMemberProfileToPdf(profile, org?.displayName ?? "Synaxis MMP", org?.logoUrl);
+      logExport(`${member.fullName} profile (${format === "excel" ? "Excel" : "PDF"})`);
+    } finally {
+      setDownloadingProfile(false);
+    }
+  }
+
   async function onCompleteFollowUp(followUpId: string, outcome: string) {
     setFollowUps((prev) =>
       prev.map((f) => (f.id === followUpId ? { ...f, status: FollowUpStatus.COMPLETED, outcome } : f)),
@@ -195,6 +229,62 @@ export function MemberDetailPage() {
           ))}
         </select>
       </div>
+
+      {user && PROFILE_REPORT_ROLES.includes(user.role) && (
+        <section
+          className="rounded-xl border p-4 mb-6"
+          style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+        >
+          <h2 className="text-sm font-medium mb-3">Download profile</h2>
+          <p className="text-xs mb-3" style={{ color: "var(--ink-muted)" }}>
+            Attendance (present/absent) and giving for a chosen period, in one document.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--ink-muted)" }}>
+                From
+              </label>
+              <input
+                type="date"
+                value={profileFrom}
+                onChange={(e) => setProfileFrom(e.target.value)}
+                className="rounded-md border px-2 py-1.5 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--ink-muted)" }}>
+                To
+              </label>
+              <input
+                type="date"
+                value={profileTo}
+                onChange={(e) => setProfileTo(e.target.value)}
+                className="rounded-md border px-2 py-1.5 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={downloadingProfile}
+              onClick={() => downloadProfile("excel")}
+              className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+            >
+              Excel (.xlsx)
+            </button>
+            <button
+              type="button"
+              disabled={downloadingProfile}
+              onClick={() => downloadProfile("pdf")}
+              className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+            >
+              PDF
+            </button>
+          </div>
+        </section>
+      )}
 
       <section
         className="rounded-xl border p-4 mb-6"

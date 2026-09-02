@@ -389,7 +389,11 @@ function AttendanceListsTab() {
       </Card>
       <Card
         title="Individual attendance"
-        exportRows={memberAttendance?.lines.map((l) => ({ Session: l.sessionName, "Checked in at": l.checkedInAt }))}
+        exportRows={memberAttendance?.lines.map((l) => ({
+          Session: l.sessionName,
+          Date: l.sessionDate,
+          Status: l.present ? "Present" : "Absent",
+        }))}
       >
         <div className="mb-3">
           <MemberSearchSelect members={members} value={memberId} onChange={setMemberId} emptyLabel="Choose a member" />
@@ -397,13 +401,16 @@ function AttendanceListsTab() {
         {memberAttendance && (
           <>
             <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>
-              {memberAttendance.totalCheckIns} check-in{memberAttendance.totalCheckIns === 1 ? "" : "s"}
+              {memberAttendance.totalCheckIns} check-in{memberAttendance.totalCheckIns === 1 ? "" : "s"} all-time
               {memberAttendance.firstCheckIn &&
                 ` · first ${new Date(memberAttendance.firstCheckIn).toLocaleDateString()} · last ${new Date(memberAttendance.lastCheckIn as string).toLocaleDateString()}`}
             </p>
+            <p className="text-xs mb-2" style={{ color: "var(--ink-muted)" }}>
+              Last {memberAttendance.lines.length} sessions:
+            </p>
             <div className="rounded-md border overflow-hidden max-h-72 overflow-y-auto" style={{ borderColor: "var(--line-soft)" }}>
               {memberAttendance.lines.length === 0 ? (
-                <div className="p-3 text-xs" style={{ color: "var(--ink-muted)" }}>No check-ins on record for this member.</div>
+                <div className="p-3 text-xs" style={{ color: "var(--ink-muted)" }}>No sessions on record yet.</div>
               ) : (
                 memberAttendance.lines.map((l, i) => (
                   <div
@@ -411,8 +418,22 @@ function AttendanceListsTab() {
                     className="flex items-center justify-between px-3 py-2 text-xs border-t first:border-t-0"
                     style={{ borderColor: "var(--line-soft)" }}
                   >
-                    <span>{l.sessionName}</span>
-                    <span style={{ color: "var(--ink-muted)" }}>{new Date(l.checkedInAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+                    <span>
+                      {l.sessionName}{" "}
+                      <span style={{ color: "var(--ink-muted)" }}>
+                        {new Date(l.sessionDate).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                      </span>
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+                      style={
+                        l.present
+                          ? { background: "var(--accent-soft)", color: "var(--accent-ink)" }
+                          : { background: "var(--danger-soft)", color: "var(--danger)" }
+                      }
+                    >
+                      {l.present ? "Present" : "Absent"}
+                    </span>
                   </div>
                 ))
               )}
